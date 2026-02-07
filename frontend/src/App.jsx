@@ -10,6 +10,7 @@ import CustomersList from "./pages/customers/CustomersList";
 import CustomerDetail from "./pages/customers/CustomerDetail";
 import TemplatesList from "./pages/templates/TemplatesList";
 import FollowUpsList from "./pages/followups/FollowUpsList";
+import UserSettings from "./pages/settings/UserSettings";
 import PrivateRoute from "./components/PrivateRoute";
 import Layout from "./components/Layout";
 import CustomerForm from "./pages/customers/CustomerForm";
@@ -54,6 +55,9 @@ function App() {
 
               {/* Follow-up routes */}
               <Route path="/followups" element={<FollowUpsList />} />
+
+              {/* Settings routes */}
+              <Route path="/settings" element={<UserSettings />} />
             </Route>
           </Route>
         </Routes>

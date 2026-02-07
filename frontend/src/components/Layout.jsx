@@ -25,6 +25,7 @@ import {
   CheckCircle as CheckCircleIcon,
   Description as DescriptionIcon,
   Logout as LogoutIcon,
+  Settings as SettingsIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -46,6 +47,11 @@ const Layout = () => {
 
   const handleMenuClose = () => {
     setAnchorEl(null);
+  };
+
+  const handleSettings = () => {
+    handleMenuClose();
+    navigate("/settings");
   };
 
   const handleLogout = () => {
@@ -118,6 +124,12 @@ const Layout = () => {
               open={Boolean(anchorEl)}
               onClose={handleMenuClose}
             >
+              <MenuItem onClick={handleSettings}>
+                <ListItemIcon>
+                  <SettingsIcon fontSize="small" />
+                </ListItemIcon>
+                Settings
+              </MenuItem>
               <MenuItem onClick={handleLogout}>
                 <ListItemIcon>
                   <LogoutIcon fontSize="small" />
