@@ -27,7 +27,6 @@ import {
   Logout as LogoutIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
-import { Analytics } from "@vercel/analytics";
 
 const drawerWidth = 240;
 
@@ -175,7 +174,6 @@ const Layout = () => {
         <Toolbar />
         <Outlet />
       </Box>
-      <Analytics />
     </Box>
   );
 };
