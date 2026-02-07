@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { useState } from "react";
+import { Outlet, useNavigate } from "react-router-dom";
 import {
   AppBar,
   Box,
@@ -17,7 +17,7 @@ import {
   Avatar,
   Menu,
   MenuItem,
-} from '@mui/material';
+} from "@mui/material";
 import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
@@ -25,8 +25,9 @@ import {
   CheckCircle as CheckCircleIcon,
   Description as DescriptionIcon,
   Logout as LogoutIcon,
-} from '@mui/icons-material';
-import { useAuth } from '../contexts/AuthContext';
+} from "@mui/icons-material";
+import { useAuth } from "../contexts/AuthContext";
+import { Analytics } from "@vercel/analytics";
 
 const drawerWidth = 240;
 
@@ -54,9 +55,9 @@ const Layout = () => {
   };
 
   const menuItems = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-    { text: 'Customers', icon: <PeopleIcon />, path: '/customers' },
-    { text: 'Templates', icon: <DescriptionIcon />, path: '/templates' },
+    { text: "Dashboard", icon: <DashboardIcon />, path: "/dashboard" },
+    { text: "Customers", icon: <PeopleIcon />, path: "/customers" },
+    { text: "Templates", icon: <DescriptionIcon />, path: "/templates" },
   ];
 
   const drawer = (
@@ -81,7 +82,7 @@ const Layout = () => {
   );
 
   return (
-    <Box sx={{ display: 'flex' }}>
+    <Box sx={{ display: "flex" }}>
       <CssBaseline />
       <AppBar
         position="fixed"
@@ -96,20 +97,21 @@ const Layout = () => {
             aria-label="open drawer"
             edge="start"
             onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { sm: 'none' } }}
+            sx={{ mr: 2, display: { sm: "none" } }}
           >
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             {/* Page title will go here */}
           </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
             <Typography variant="body1">
               {user?.firstName} {user?.lastName}
             </Typography>
             <IconButton onClick={handleMenuOpen} color="inherit">
               <Avatar sx={{ width: 32, height: 32 }}>
-                {user?.firstName?.[0]}{user?.lastName?.[0]}
+                {user?.firstName?.[0]}
+                {user?.lastName?.[0]}
               </Avatar>
             </IconButton>
             <Menu
@@ -139,9 +141,9 @@ const Layout = () => {
             keepMounted: true,
           }}
           sx={{
-            display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': {
-              boxSizing: 'border-box',
+            display: { xs: "block", sm: "none" },
+            "& .MuiDrawer-paper": {
+              boxSizing: "border-box",
               width: drawerWidth,
             },
           }}
@@ -151,9 +153,9 @@ const Layout = () => {
         <Drawer
           variant="permanent"
           sx={{
-            display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': {
-              boxSizing: 'border-box',
+            display: { xs: "none", sm: "block" },
+            "& .MuiDrawer-paper": {
+              boxSizing: "border-box",
               width: drawerWidth,
             },
           }}
@@ -173,6 +175,7 @@ const Layout = () => {
         <Toolbar />
         <Outlet />
       </Box>
+      <Analytics />
     </Box>
   );
 };
