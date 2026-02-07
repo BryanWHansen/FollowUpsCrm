@@ -1,13 +1,13 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { authAPI } from '../api/endpoints';
+import { createContext, useContext, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { authAPI } from "../api/endpoints";
 
 const AuthContext = createContext(null);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
@@ -20,14 +20,14 @@ export const AuthProvider = ({ children }) => {
   // Check for existing token on mount
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (token) {
         try {
           const response = await authAPI.getCurrentUser();
           setUser(response.data);
         } catch (error) {
-          console.error('Auth check failed:', error);
-          localStorage.removeItem('token');
+          console.error("Auth check failed:", error);
+          localStorage.removeItem("token");
         }
       }
       setLoading(false);
@@ -40,16 +40,16 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await authAPI.login({ email, password });
       const { token, ...userData } = response.data;
-      
-      localStorage.setItem('token', token);
+
+      localStorage.setItem("token", token);
       setUser(userData);
-      navigate('/dashboard');
-      
+      navigate("/dashboard");
+
       return { success: true };
     } catch (error) {
       return {
         success: false,
-        error: error.response?.data?.error || 'Login failed'
+        error: error.response?.data?.error || "Login failed",
       };
     }
   };
@@ -58,24 +58,53 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await authAPI.register(userData);
       const { token, ...userInfo } = response.data;
-      
-      localStorage.setItem('token', token);
+
+      localStorage.setItem("token", token);
       setUser(userInfo);
-      navigate('/dashboard');
-      
+      navigate("/dashboard");
+
       return { success: true };
     } catch (error) {
       return {
         success: false,
-        error: error.response?.data?.error || error.response?.data?.errors || 'Registration failed'
+        error:
+          error.response?.data?.error ||
+          error.response?.data?.errors ||
+          "Registration failed",
       };
     }
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    localStorage.removeItem("token");
     setUser(null);
-    navigate('/login');
+    navigate("/login");
+  };
+
+  const updateUser = async (userData) => {
+    try {
+      const response = await authAPI.updateUser(userData);
+      setUser(response.data);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error:
+          error.response?.data?.error || "Failed to update user information",
+      };
+    }
+  };
+
+  const changePassword = async (passwordData) => {
+    try {
+      await authAPI.changePassword(passwordData);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.response?.data?.error || "Failed to change password",
+      };
+    }
   };
 
   const value = {
@@ -84,12 +113,10 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     logout,
-    isAuthenticated: !!user
+    updateUser,
+    changePassword,
+    isAuthenticated: !!user,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
