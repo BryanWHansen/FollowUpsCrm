@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Container,
   Paper,
@@ -14,14 +14,29 @@ import {
   ListItemText,
   Divider,
   Grid,
+  FormControlLabel,
+  Switch,
+  MenuItem,
 } from "@mui/material";
 import { useAuth } from "../../contexts/AuthContext";
 import ChangePasswordModal from "../../components/modals/ChangePasswordModal";
+import { userPreferencesAPI } from "../../api/endpoints";
 
 const UserSettings = () => {
   const { user, updateUser, changePassword } = useAuth();
   const [selectedTab, setSelectedTab] = useState("general");
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+
+  // Email preferences state
+  const [emailPreferences, setEmailPreferences] = useState({
+    emailDigestEnabled: true,
+    emailDigestTime: "08:00",
+    emailDigestTimezone:
+      Intl.DateTimeFormat().resolvedOptions().timeZone || "America/New_York",
+  });
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [emailSuccess, setEmailSuccess] = useState("");
 
   // General settings state
   const [generalFormData, setGeneralFormData] = useState({
@@ -39,6 +54,25 @@ const UserSettings = () => {
   const [securityLoading, setSecurityLoading] = useState(false);
   const [securityError, setSecurityError] = useState("");
   const [securitySuccess, setSecuritySuccess] = useState("");
+
+  // Load profile data on mount
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      const response = await userPreferencesAPI.getProfile();
+      const profile = response.data;
+      setEmailPreferences({
+        emailDigestEnabled: profile.emaildigestenabled ?? true,
+        emailDigestTime: profile.emaildigesttime?.substring(0, 5) || "08:00",
+        emailDigestTimezone: profile.emaildigesttimezone || "America/New_York",
+      });
+    } catch (error) {
+      console.error("Error loading profile:", error);
+    }
+  };
 
   const handleGeneralChange = (e) => {
     const { name, value } = e.target;
@@ -134,6 +168,33 @@ const UserSettings = () => {
     return result;
   };
 
+  const handleEmailPreferenceChange = (e) => {
+    const { name, value, checked, type } = e.target;
+    setEmailPreferences((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+    setEmailError("");
+    setEmailSuccess("");
+  };
+
+  const handleSaveEmailPreferences = async (e) => {
+    e.preventDefault();
+    setEmailLoading(true);
+    setEmailError("");
+    setEmailSuccess("");
+
+    try {
+      await userPreferencesAPI.updateEmailPreferences(emailPreferences);
+      setEmailSuccess("Email preferences saved successfully!");
+    } catch (error) {
+      setEmailError("Failed to save preferences. Please try again.");
+      console.error("Error saving preferences:", error);
+    } finally {
+      setEmailLoading(false);
+    }
+  };
+
   const renderGeneralTab = () => (
     <Box>
       <Typography variant="h5" gutterBottom>
@@ -187,6 +248,111 @@ const UserSettings = () => {
             sx={{ minWidth: 120 }}
           >
             {generalLoading ? <CircularProgress size={24} /> : "Save Changes"}
+          </Button>
+        </Box>
+      </Box>
+    </Box>
+  );
+
+  const renderEmailTab = () => (
+    <Box>
+      <Typography variant="h5" gutterBottom>
+        Email Notifications
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+        Configure your daily follow-up digest email preferences
+      </Typography>
+
+      {emailError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {emailError}
+        </Alert>
+      )}
+
+      {emailSuccess && (
+        <Alert severity="success" sx={{ mb: 2 }}>
+          {emailSuccess}
+        </Alert>
+      )}
+
+      <Box component="form" onSubmit={handleSaveEmailPreferences}>
+        <FormControlLabel
+          control={
+            <Switch
+              checked={emailPreferences.emailDigestEnabled}
+              onChange={handleEmailPreferenceChange}
+              name="emailDigestEnabled"
+              disabled={emailLoading}
+            />
+          }
+          label={
+            <Box>
+              <Typography variant="body1">Enable Daily Email Digest</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Receive an email each day with your scheduled follow-ups and SMS
+                quick links
+              </Typography>
+            </Box>
+          }
+          sx={{ alignItems: "flex-start", mb: 3 }}
+        />
+
+        {emailPreferences.emailDigestEnabled && (
+          <>
+            <TextField
+              fullWidth
+              label="Digest Time"
+              name="emailDigestTime"
+              type="time"
+              value={emailPreferences.emailDigestTime}
+              onChange={handleEmailPreferenceChange}
+              margin="normal"
+              disabled={emailLoading}
+              InputLabelProps={{
+                shrink: true,
+              }}
+              helperText="Time of day to send your daily digest (in your local timezone)"
+            />
+
+            <TextField
+              fullWidth
+              select
+              label="Timezone"
+              name="emailDigestTimezone"
+              value={emailPreferences.emailDigestTimezone}
+              onChange={handleEmailPreferenceChange}
+              margin="normal"
+              disabled={emailLoading}
+              helperText="Your local timezone for scheduling the digest"
+            >
+              <MenuItem value="America/New_York">Eastern Time (ET)</MenuItem>
+              <MenuItem value="America/Chicago">Central Time (CT)</MenuItem>
+              <MenuItem value="America/Denver">Mountain Time (MT)</MenuItem>
+              <MenuItem value="America/Los_Angeles">Pacific Time (PT)</MenuItem>
+              <MenuItem value="America/Phoenix">Arizona (MST)</MenuItem>
+              <MenuItem value="America/Anchorage">Alaska (AKT)</MenuItem>
+              <MenuItem value="Pacific/Honolulu">Hawaii (HST)</MenuItem>
+              <MenuItem value="Europe/London">London (GMT/BST)</MenuItem>
+              <MenuItem value="Europe/Paris">Paris (CET/CEST)</MenuItem>
+              <MenuItem value="Asia/Tokyo">Tokyo (JST)</MenuItem>
+              <MenuItem value="Australia/Sydney">Sydney (AEST/AEDT)</MenuItem>
+            </TextField>
+          </>
+        )}
+
+        <Box sx={{ mt: 3 }}>
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            disabled={emailLoading}
+            sx={{ minWidth: 120 }}
+          >
+            {emailLoading ? (
+              <CircularProgress size={24} />
+            ) : (
+              "Save Email Preferences"
+            )}
           </Button>
         </Box>
       </Box>
@@ -290,6 +456,14 @@ const UserSettings = () => {
                     <ListItemText primary="Sign-in & Security" />
                   </ListItemButton>
                 </ListItem>
+                <ListItem disablePadding>
+                  <ListItemButton
+                    selected={selectedTab === "email"}
+                    onClick={() => setSelectedTab("email")}
+                  >
+                    <ListItemText primary="Email Notifications" />
+                  </ListItemButton>
+                </ListItem>
               </List>
             </Box>
           </Grid>
@@ -299,6 +473,7 @@ const UserSettings = () => {
             <Box sx={{ p: 4 }}>
               {selectedTab === "general" && renderGeneralTab()}
               {selectedTab === "security" && renderSecurityTab()}
+              {selectedTab === "email" && renderEmailTab()}
             </Box>
           </Grid>
         </Grid>

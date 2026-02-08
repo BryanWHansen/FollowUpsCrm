@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { authAPI } from "../api/endpoints";
+import { authAPI, userPreferencesAPI } from "../api/endpoints";
 
 const AuthContext = createContext(null);
 
@@ -83,7 +83,7 @@ export const AuthProvider = ({ children }) => {
 
   const updateUser = async (userData) => {
     try {
-      const response = await authAPI.updateUser(userData);
+      const response = await userPreferencesAPI.updateUser(userData);
       setUser(response.data);
       return { success: true };
     } catch (error) {

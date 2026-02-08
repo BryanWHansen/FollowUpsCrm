@@ -34,4 +34,10 @@ router.put(
   authenticateToken,
   authController.changePassword,
 );
+router.get("/profile", authenticateToken, authController.getProfile);
+router.patch(
+  "/email-preferences",
+  authenticateToken,
+  authController.updateEmailPreferences,
+);
 module.exports = router;

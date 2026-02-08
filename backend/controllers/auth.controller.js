@@ -7,6 +7,7 @@ const {
   validateUserRegistration,
   validateUserLogin,
 } = require("../models/user.model");
+const { get } = require("../routes/auth.routes");
 
 /**
  * Register a new user
@@ -265,6 +266,98 @@ const changePassword = async (req, res) => {
   }
 };
 
+const updateEmailPreferences = async (req, res) => {
+  const userId = req.user.userId;
+  const { emailDigestEnabled, emailDigestTime, emailDigestTimezone } = req.body;
+
+  try {
+    // Validate inputs
+    if (
+      emailDigestTime &&
+      !/^([01]\d|2[0-3]):([0-5]\d)$/.test(emailDigestTime)
+    ) {
+      return res.status(400).json({ error: "Invalid time format. Use HH:MM" });
+    }
+
+    // Build dynamic update query
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (emailDigestEnabled !== undefined) {
+      updates.push(`emailDigestEnabled = $${paramCount}`);
+      values.push(emailDigestEnabled);
+      paramCount++;
+    }
+
+    if (emailDigestTime !== undefined) {
+      updates.push(`emailDigestTime = $${paramCount}`);
+      values.push(emailDigestTime);
+      paramCount++;
+    }
+
+    if (emailDigestTimezone !== undefined) {
+      updates.push(`emailDigestTimezone = $${paramCount}`);
+      values.push(emailDigestTimezone);
+      paramCount++;
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: "No updates provided" });
+    }
+
+    // Add userId to values
+    values.push(userId);
+
+    const query = `
+      UPDATE users 
+      SET ${updates.join(", ")}, updatedAt = CURRENT_TIMESTAMP
+      WHERE userId = $${paramCount}
+      RETURNING userId, email, emailDigestEnabled, emailDigestTime, emailDigestTimezone
+    `;
+
+    const result = await pool.query(query, values);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({
+      message: "Email preferences updated successfully",
+      preferences: result.rows[0],
+    });
+  } catch (error) {
+    console.error("Error updating email preferences:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+// Also update getProfile or similar endpoint to include email preferences
+const getProfile = async (req, res) => {
+  const userId = req.user.userId;
+
+  try {
+    const query = `
+      SELECT userId, email, firstName, lastName, 
+             emailDigestEnabled, emailDigestTime, emailDigestTimezone,
+             createdAt, updatedAt
+      FROM users 
+      WHERE userId = $1
+    `;
+
+    const result = await pool.query(query, [userId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Error fetching profile:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -272,4 +365,6 @@ module.exports = {
   getCurrentUser,
   updateUser,
   changePassword,
+  updateEmailPreferences,
+  getProfile,
 };

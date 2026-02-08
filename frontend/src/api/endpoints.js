@@ -6,7 +6,6 @@ export const authAPI = {
   login: (credentials) => api.post("/api/auth/login", credentials),
   logout: () => api.post("/api/auth/logout"),
   getCurrentUser: () => api.get("/api/auth/me"),
-  updateUser: (userData) => api.put("/api/auth/me", userData),
   changePassword: (passwordData) =>
     api.put("/api/auth/change-password", passwordData),
 };
@@ -72,4 +71,12 @@ export const interestVehicleAPI = {
   update: (id, interestVehicle) =>
     api.put(`/api/interest-vehicles/${id}`, interestVehicle),
   delete: (id) => api.delete(`/api/interest-vehicles/${id}`),
+};
+
+// User Profile & Preferences
+export const userPreferencesAPI = {
+  getProfile: () => api.get("/api/auth/profile"),
+  updateUser: (userData) => api.put("/api/auth/me", userData),
+  updateEmailPreferences: (preferences) =>
+    api.patch("/api/auth/email-preferences", preferences),
 };
