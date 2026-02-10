@@ -29,6 +29,7 @@ const Dashboard = () => {
   const [upcomingFollowups, setUpcomingFollowups] = useState([]);
   const [monthlyFollowups, setMonthlyFollowups] = useState([]);
   const [todoInteractions, setTodoInteractions] = useState([]);
+  const [typesWithoutTemplates, setTypesWithoutTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -45,19 +46,22 @@ const Dashboard = () => {
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-      const [upcomingRes, monthlyRes, interactionsRes] = await Promise.all([
-        followupAPI.getUpcoming(3),
-        followupAPI.getAll({
-          scheduledDateFrom: firstDay.toISOString().split("T")[0],
-          scheduledDateTo: lastDay.toISOString().split("T")[0],
-          status: "pending",
-        }),
-        interactionAPI.getWithoutVehicles(),
-      ]);
+      const [upcomingRes, monthlyRes, interactionsRes, typesRes] =
+        await Promise.all([
+          followupAPI.getUpcoming(3),
+          followupAPI.getAll({
+            scheduledDateFrom: firstDay.toISOString().split("T")[0],
+            scheduledDateTo: lastDay.toISOString().split("T")[0],
+            status: "pending",
+          }),
+          interactionAPI.getWithoutVehicles(),
+          interactionAPI.getTypesWithoutTemplates(),
+        ]);
 
       setUpcomingFollowups(upcomingRes.data);
       setMonthlyFollowups(monthlyRes.data);
       setTodoInteractions(interactionsRes.data);
+      setTypesWithoutTemplates(typesRes.data);
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
       setError("Failed to load dashboard data");
@@ -216,6 +220,79 @@ const Dashboard = () => {
                     </TableBody>
                   </Table>
                 </TableContainer>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Interaction Types Without Templates */}
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom>
+                Missing Templates
+              </Typography>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Interaction types without follow-up templates. Create templates
+                to automate follow-ups.
+              </Typography>
+              {typesWithoutTemplates.length === 0 ? (
+                <Alert severity="success" sx={{ mt: 2 }}>
+                  ✓ All interaction types have templates
+                </Alert>
+              ) : (
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Interaction Type</TableCell>
+                        <TableCell align="right">
+                          Existing Interactions
+                        </TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {typesWithoutTemplates.map((item) => (
+                        <TableRow
+                          key={item.interactionType}
+                          sx={{
+                            "&:hover": { backgroundColor: "action.hover" },
+                          }}
+                        >
+                          <TableCell>
+                            <Chip
+                              label={formatInteractionType(
+                                item.interactionType,
+                              )}
+                              color={getInteractionTypeColor(
+                                item.interactionType,
+                              )}
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell align="right">
+                            <Typography
+                              variant="body2"
+                              color={
+                                item.count > 0 ? "error" : "text.secondary"
+                              }
+                            >
+                              {item.count}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+              {typesWithoutTemplates.length > 0 && (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: "block", mt: 1 }}
+                >
+                  💡 Interactions of these types won't generate follow-ups until
+                  templates are created
+                </Typography>
               )}
             </CardContent>
           </Card>

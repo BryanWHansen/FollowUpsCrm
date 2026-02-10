@@ -41,7 +41,7 @@ const validateTemplate = (template) => {
   }
   
   // Validate interaction type is one of the allowed values
-  const validTypes = ['purchase', 'interest', 'test_drive', 'service_visit', 'general_inquiry'];
+  const validTypes = ['purchase', 'interest', 'test_drive', 'general_inquiry'];
   if (template.interactionType && !validTypes.includes(template.interactionType.toLowerCase())) {
     errors.push(`Interaction type must be one of: ${validTypes.join(', ')}`);
   }

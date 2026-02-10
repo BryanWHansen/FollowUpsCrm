@@ -28,6 +28,9 @@ import {
 import { customerAPI } from "../../api/endpoints";
 import { format } from "date-fns";
 import CustomerFormModal from "../../components/modals/CustomerFormModal";
+import InteractionFormModal from "../../components/modals/InteractionFormModal";
+import VehicleFormModal from "../../components/modals/VehicleFormModal";
+import InterestVehicleFormModal from "../../components/modals/InterestVehicleFormModal";
 
 const CustomersList = () => {
   const [customers, setCustomers] = useState([]);
@@ -37,7 +40,14 @@ const CustomersList = () => {
   const [customerToDelete, setCustomerToDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
+  const [interactionModalOpen, setInteractionModalOpen] = useState(false);
+  const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
+  const [interestVehicleModalOpen, setInterestVehicleModalOpen] =
+    useState(false);
   const [editCustomerId, setEditCustomerId] = useState(null);
+  const [pendingCustomerId, setPendingCustomerId] = useState(null);
+  const [pendingInteractionId, setPendingInteractionId] = useState(null);
+  const [pendingInteractionType, setPendingInteractionType] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -89,15 +99,62 @@ const CustomersList = () => {
 
   const handleOpenModal = () => {
     setEditCustomerId(null);
+    setPendingCustomerId(null); // Clear any old workflow state
     setCustomerModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setCustomerModalOpen(false);
     setEditCustomerId(null);
+    // Don't clear pendingCustomerId here - it's needed for the workflow
+    // It will be cleared when vehicle modal closes or if user starts a new customer creation
   };
 
-  const handleCustomerSuccess = () => {
+  const handleCustomerSuccess = (newCustomer) => {
+    fetchCustomers();
+    // If a new customer was created (not editing), open interaction modal
+    if (newCustomer && newCustomer.customerId) {
+      setPendingCustomerId(newCustomer.customerId);
+      setInteractionModalOpen(true);
+    }
+  };
+
+  const handleInteractionSuccess = () => {
+    fetchCustomers();
+  };
+
+  const handleVehicleNeeded = (interactionId, interactionType) => {
+    setPendingInteractionId(interactionId);
+    setPendingInteractionType(interactionType);
+
+    if (interactionType === "purchase") {
+      setVehicleModalOpen(true);
+    } else {
+      setInterestVehicleModalOpen(true);
+    }
+  };
+
+  const handleCloseInteractionModal = () => {
+    setInteractionModalOpen(false);
+    // Don't clear pendingCustomerId here - it's needed for vehicle modal
+    // Only clear it when vehicle modal closes
+  };
+
+  const handleCloseVehicleModal = () => {
+    setVehicleModalOpen(false);
+    setPendingInteractionId(null);
+    setPendingInteractionType(null);
+    setPendingCustomerId(null); // Clear now that entire flow is complete
+  };
+
+  const handleCloseInterestVehicleModal = () => {
+    setInterestVehicleModalOpen(false);
+    setPendingInteractionId(null);
+    setPendingInteractionType(null);
+    setPendingCustomerId(null); // Clear now that entire flow is complete
+  };
+
+  const handleVehicleSuccess = () => {
     fetchCustomers();
   };
 
@@ -281,6 +338,36 @@ const CustomersList = () => {
         onClose={handleCloseModal}
         customerId={editCustomerId}
         onSuccess={handleCustomerSuccess}
+      />
+
+      {/* Interaction Form Modal */}
+      <InteractionFormModal
+        open={interactionModalOpen}
+        onClose={handleCloseInteractionModal}
+        customerId={pendingCustomerId}
+        onSuccess={handleInteractionSuccess}
+        onVehicleNeeded={handleVehicleNeeded}
+        fromNewCustomer={true}
+      />
+
+      {/* Vehicle Form Modal */}
+      <VehicleFormModal
+        open={vehicleModalOpen}
+        onClose={handleCloseVehicleModal}
+        customerId={pendingCustomerId}
+        interactionId={pendingInteractionId}
+        onSuccess={handleVehicleSuccess}
+        fromNewCustomer={true}
+      />
+
+      {/* Interest Vehicle Form Modal */}
+      <InterestVehicleFormModal
+        open={interestVehicleModalOpen}
+        onClose={handleCloseInterestVehicleModal}
+        customerId={pendingCustomerId}
+        interactionId={pendingInteractionId}
+        onSuccess={handleVehicleSuccess}
+        fromNewCustomer={true}
       />
     </Box>
   );

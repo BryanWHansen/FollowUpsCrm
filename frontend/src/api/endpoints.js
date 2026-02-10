@@ -34,6 +34,8 @@ export const interactionAPI = {
   getAll: (params) => api.get("/api/interactions", { params }),
   getById: (id) => api.get(`/api/interactions/${id}`),
   getWithoutVehicles: () => api.get("/api/interactions/without-vehicles"),
+  getTypesWithoutTemplates: () =>
+    api.get("/api/interactions/types-without-templates"),
   create: (interaction) => api.post("/api/interactions", interaction),
   update: (id, interaction) => api.put(`/api/interactions/${id}`, interaction),
   delete: (id) => api.delete(`/api/interactions/${id}`),
@@ -79,4 +81,6 @@ export const userPreferencesAPI = {
   updateUser: (userData) => api.put("/api/auth/me", userData),
   updateEmailPreferences: (preferences) =>
     api.patch("/api/auth/email-preferences", preferences),
+  deleteAccount: (password) =>
+    api.delete("/api/auth/account", { data: { password } }),
 };

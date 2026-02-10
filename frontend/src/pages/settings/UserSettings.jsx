@@ -17,15 +17,23 @@ import {
   FormControlLabel,
   Switch,
   MenuItem,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import { useAuth } from "../../contexts/AuthContext";
 import ChangePasswordModal from "../../components/modals/ChangePasswordModal";
 import { userPreferencesAPI } from "../../api/endpoints";
 
 const UserSettings = () => {
-  const { user, updateUser, changePassword } = useAuth();
+  const { user, updateUser, changePassword, deleteAccount } = useAuth();
   const [selectedTab, setSelectedTab] = useState("general");
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   // Email preferences state
   const [emailPreferences, setEmailPreferences] = useState({
@@ -195,6 +203,30 @@ const UserSettings = () => {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (!deletePassword) {
+      setDeleteError("Please enter your password to confirm deletion");
+      return;
+    }
+
+    setDeleteLoading(true);
+    setDeleteError("");
+
+    const result = await deleteAccount(deletePassword);
+
+    if (!result.success) {
+      setDeleteError(result.error || "Failed to delete account");
+      setDeleteLoading(false);
+    }
+    // If successful, user will be logged out and redirected
+  };
+
+  const handleCloseDeleteDialog = () => {
+    setDeleteDialogOpen(false);
+    setDeletePassword("");
+    setDeleteError("");
+  };
+
   const renderGeneralTab = () => (
     <Box>
       <Typography variant="h5" gutterBottom>
@@ -250,6 +282,63 @@ const UserSettings = () => {
             {generalLoading ? <CircularProgress size={24} /> : "Save Changes"}
           </Button>
         </Box>
+      </Box>
+    </Box>
+  );
+
+  const renderDeleteAccountTab = () => (
+    <Box>
+      <Typography variant="h5" gutterBottom color="error">
+        Delete Account
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+        Permanently delete your account and all associated data
+      </Typography>
+
+      <Alert severity="error" sx={{ mb: 3 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: "bold", mb: 1 }}>
+          ⚠️ Warning: This action cannot be undone
+        </Typography>
+        <Typography variant="body2">
+          Deleting your account will permanently remove:
+        </Typography>
+        <ul style={{ margin: "8px 0", paddingLeft: "20px" }}>
+          <li>Your user profile and login credentials</li>
+          <li>All customers and their contact information</li>
+          <li>All interactions and follow-up history</li>
+          <li>All vehicles and interest vehicles</li>
+          <li>All follow-up templates you've created</li>
+          <li>All email digest history</li>
+        </ul>
+        <Typography variant="body2" sx={{ fontWeight: "bold", mt: 1 }}>
+          This data cannot be recovered once deleted.
+        </Typography>
+      </Alert>
+
+      <Box
+        sx={{
+          p: 3,
+          border: "2px solid",
+          borderColor: "error.main",
+          borderRadius: 2,
+          backgroundColor: "#fff5f5",
+        }}
+      >
+        <Typography variant="h6" color="error" gutterBottom>
+          Proceed with Caution
+        </Typography>
+        <Typography variant="body2" sx={{ mb: 2 }}>
+          If you're sure you want to delete your account, click the button
+          below. You will be asked to confirm with your password.
+        </Typography>
+        <Button
+          variant="contained"
+          color="error"
+          onClick={() => setDeleteDialogOpen(true)}
+          sx={{ minWidth: 180 }}
+        >
+          Delete My Account
+        </Button>
       </Box>
     </Box>
   );
@@ -464,6 +553,15 @@ const UserSettings = () => {
                     <ListItemText primary="Email Notifications" />
                   </ListItemButton>
                 </ListItem>
+                <ListItem disablePadding>
+                  <ListItemButton
+                    selected={selectedTab === "delete"}
+                    onClick={() => setSelectedTab("delete")}
+                    sx={{ color: "error.main" }}
+                  >
+                    <ListItemText primary="Delete Account" />
+                  </ListItemButton>
+                </ListItem>
               </List>
             </Box>
           </Grid>
@@ -474,6 +572,7 @@ const UserSettings = () => {
               {selectedTab === "general" && renderGeneralTab()}
               {selectedTab === "security" && renderSecurityTab()}
               {selectedTab === "email" && renderEmailTab()}
+              {selectedTab === "delete" && renderDeleteAccountTab()}
             </Box>
           </Grid>
         </Grid>
@@ -484,6 +583,57 @@ const UserSettings = () => {
         onClose={() => setPasswordModalOpen(false)}
         onChangePassword={handleChangePassword}
       />
+
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleCloseDeleteDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ color: "error.main", fontWeight: "bold" }}>
+          ⚠️ Confirm Account Deletion
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" sx={{ mb: 2 }}>
+            Are you absolutely sure you want to delete your account?
+          </Typography>
+          <Alert severity="error" sx={{ mb: 2 }}>
+            This will permanently delete all your customers, follow-ups,
+            templates, and cannot be undone.
+          </Alert>
+          <Typography variant="body2" sx={{ mb: 2, fontWeight: "bold" }}>
+            Enter your password to confirm:
+          </Typography>
+          {deleteError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {deleteError}
+            </Alert>
+          )}
+          <TextField
+            fullWidth
+            type="password"
+            label="Password"
+            value={deletePassword}
+            onChange={(e) => setDeletePassword(e.target.value)}
+            disabled={deleteLoading}
+            autoFocus
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={handleCloseDeleteDialog} disabled={deleteLoading}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeleteAccount}
+            variant="contained"
+            color="error"
+            disabled={deleteLoading}
+            sx={{ minWidth: 120 }}
+          >
+            {deleteLoading ? <CircularProgress size={24} /> : "Delete Account"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   );
 };

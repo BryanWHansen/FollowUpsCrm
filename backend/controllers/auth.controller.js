@@ -36,10 +36,13 @@ const register = async (req, res) => {
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    // Insert user
+    // Insert user with email digest defaults
     const result = await pool.query(
-      `INSERT INTO users (email, passwordHash, firstName, lastName) 
-       VALUES ($1, $2, $3, $4) 
+      `INSERT INTO users (
+        email, passwordHash, firstName, lastName,
+        emailDigestEnabled, emailDigestTime, emailDigestTimezone
+      ) 
+       VALUES ($1, $2, $3, $4, true, '08:00:00', 'America/New_York') 
        RETURNING *`,
       [email.toLowerCase(), passwordHash, firstName, lastName],
     );
@@ -95,6 +98,9 @@ const login = async (req, res) => {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
+    // Check if this is first login (lastLogin is NULL)
+    const isFirstLogin = userRow.lastlogin === null;
+
     // Update last login
     await pool.query("UPDATE users SET lastLogin = NOW() WHERE userId = $1", [
       userRow.userid,
@@ -112,6 +118,7 @@ const login = async (req, res) => {
     res.json({
       ...user,
       token,
+      isFirstLogin,
     });
   } catch (err) {
     console.error(err.message);
@@ -358,6 +365,55 @@ const getProfile = async (req, res) => {
   }
 };
 
+/**
+ * Delete user account and all associated data
+ */
+const deleteAccount = async (req, res) => {
+  const userId = req.user.userId;
+  const { password } = req.body;
+
+  try {
+    // Verify password before deletion
+    if (!password) {
+      return res
+        .status(400)
+        .json({ error: "Password is required to delete account" });
+    }
+
+    // Get user's current password hash
+    const userResult = await pool.query(
+      "SELECT passwordHash FROM users WHERE userId = $1",
+      [userId],
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Verify password
+    const passwordMatch = await bcrypt.compare(
+      password,
+      userResult.rows[0].passwordhash,
+    );
+
+    if (!passwordMatch) {
+      return res.status(401).json({ error: "Incorrect password" });
+    }
+
+    // Delete user - all related data will be cascade deleted
+    // This includes: customers, interactions, vehicles, followups, templates, email_digests
+    await pool.query("DELETE FROM users WHERE userId = $1", [userId]);
+
+    res.json({
+      success: true,
+      message: "Account and all associated data deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting account:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -367,4 +423,5 @@ module.exports = {
   changePassword,
   updateEmailPreferences,
   getProfile,
+  deleteAccount,
 };

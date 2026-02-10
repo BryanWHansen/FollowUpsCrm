@@ -38,6 +38,7 @@ const InteractionFormModal = ({
   interactionId,
   onSuccess,
   onVehicleNeeded,
+  fromNewCustomer = false,
 }) => {
   const isEditMode = Boolean(interactionId);
   const [error, setError] = useState("");
@@ -177,7 +178,12 @@ const InteractionFormModal = ({
 
       <DialogContent dividers sx={{ pt: 3 }}>
         {!isEditMode && (
-          <Stepper activeStep={0} sx={{ mb: 3 }}>
+          <Stepper activeStep={fromNewCustomer ? 1 : 0} sx={{ mb: 3 }}>
+            {fromNewCustomer && (
+              <Step>
+                <StepLabel>Customer</StepLabel>
+              </Step>
+            )}
             <Step>
               <StepLabel>Interaction</StepLabel>
             </Step>

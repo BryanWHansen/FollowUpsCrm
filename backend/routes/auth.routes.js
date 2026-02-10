@@ -34,10 +34,18 @@ router.put(
   authenticateToken,
   authController.changePassword,
 );
+
+// GET /api/auth/profile - Get user profile
 router.get("/profile", authenticateToken, authController.getProfile);
+
+// PATCH /api/auth/email-preferences - Update email preferences
 router.patch(
   "/email-preferences",
   authenticateToken,
   authController.updateEmailPreferences,
 );
+
+// DELETE /api/auth/account - Delete user account and all data
+router.delete("/account", authenticateToken, authController.deleteAccount);
+
 module.exports = router;

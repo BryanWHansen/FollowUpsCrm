@@ -76,13 +76,17 @@ const CustomerFormModal = ({ open, onClose, customerId, onSuccess }) => {
 
       if (isEditMode) {
         await customerAPI.update(customerId, data);
+        if (onSuccess) {
+          onSuccess();
+        }
       } else {
-        await customerAPI.create(data);
+        const response = await customerAPI.create(data);
+        const newCustomer = response.data;
+        if (onSuccess) {
+          onSuccess(newCustomer);
+        }
       }
 
-      if (onSuccess) {
-        onSuccess();
-      }
       onClose();
     } catch (err) {
       setError(
