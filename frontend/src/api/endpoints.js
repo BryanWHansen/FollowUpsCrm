@@ -6,7 +6,6 @@ export const authAPI = {
   login: (credentials) => api.post("/api/auth/login", credentials),
   logout: () => api.post("/api/auth/logout"),
   getCurrentUser: () => api.get("/api/auth/me"),
-  updateUser: (userData) => api.put("/api/auth/me", userData),
   changePassword: (passwordData) =>
     api.put("/api/auth/change-password", passwordData),
 };
@@ -35,6 +34,8 @@ export const interactionAPI = {
   getAll: (params) => api.get("/api/interactions", { params }),
   getById: (id) => api.get(`/api/interactions/${id}`),
   getWithoutVehicles: () => api.get("/api/interactions/without-vehicles"),
+  getTypesWithoutTemplates: () =>
+    api.get("/api/interactions/types-without-templates"),
   create: (interaction) => api.post("/api/interactions", interaction),
   update: (id, interaction) => api.put(`/api/interactions/${id}`, interaction),
   delete: (id) => api.delete(`/api/interactions/${id}`),
@@ -72,4 +73,14 @@ export const interestVehicleAPI = {
   update: (id, interestVehicle) =>
     api.put(`/api/interest-vehicles/${id}`, interestVehicle),
   delete: (id) => api.delete(`/api/interest-vehicles/${id}`),
+};
+
+// User Profile & Preferences
+export const userPreferencesAPI = {
+  getProfile: () => api.get("/api/auth/profile"),
+  updateUser: (userData) => api.put("/api/auth/me", userData),
+  updateEmailPreferences: (preferences) =>
+    api.patch("/api/auth/email-preferences", preferences),
+  deleteAccount: (password) =>
+    api.delete("/api/auth/account", { data: { password } }),
 };

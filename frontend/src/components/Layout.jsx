@@ -26,6 +26,7 @@ import {
   Description as DescriptionIcon,
   Logout as LogoutIcon,
   Settings as SettingsIcon,
+  Help as HelpIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -47,6 +48,11 @@ const Layout = () => {
 
   const handleMenuClose = () => {
     setAnchorEl(null);
+  };
+
+  const handleWelcome = () => {
+    handleMenuClose();
+    navigate("/welcome");
   };
 
   const handleSettings = () => {
@@ -124,6 +130,12 @@ const Layout = () => {
               open={Boolean(anchorEl)}
               onClose={handleMenuClose}
             >
+              <MenuItem onClick={handleWelcome}>
+                <ListItemIcon>
+                  <HelpIcon fontSize="small" />
+                </ListItemIcon>
+                Welcome
+              </MenuItem>
               <MenuItem onClick={handleSettings}>
                 <ListItemIcon>
                   <SettingsIcon fontSize="small" />

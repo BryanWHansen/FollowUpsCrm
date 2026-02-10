@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { authAPI } from "../api/endpoints";
+import { authAPI, userPreferencesAPI } from "../api/endpoints";
 
 const AuthContext = createContext(null);
 
@@ -39,11 +39,17 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       const response = await authAPI.login({ email, password });
-      const { token, ...userData } = response.data;
+      const { token, isFirstLogin, ...userData } = response.data;
 
       localStorage.setItem("token", token);
       setUser(userData);
-      navigate("/dashboard");
+
+      // Redirect to welcome screen for first-time users
+      if (isFirstLogin) {
+        navigate("/welcome");
+      } else {
+        navigate("/dashboard");
+      }
 
       return { success: true };
     } catch (error) {
@@ -61,7 +67,9 @@ export const AuthProvider = ({ children }) => {
 
       localStorage.setItem("token", token);
       setUser(userInfo);
-      navigate("/dashboard");
+
+      // Redirect to welcome screen for new users
+      navigate("/welcome");
 
       return { success: true };
     } catch (error) {
@@ -83,7 +91,7 @@ export const AuthProvider = ({ children }) => {
 
   const updateUser = async (userData) => {
     try {
-      const response = await authAPI.updateUser(userData);
+      const response = await userPreferencesAPI.updateUser(userData);
       setUser(response.data);
       return { success: true };
     } catch (error) {
@@ -107,6 +115,22 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const deleteAccount = async (password) => {
+    try {
+      await userPreferencesAPI.deleteAccount(password);
+      // Log out the user after successful deletion
+      localStorage.removeItem("token");
+      setUser(null);
+      navigate("/login");
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.response?.data?.error || "Failed to delete account",
+      };
+    }
+  };
+
   const value = {
     user,
     loading,
@@ -115,6 +139,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     updateUser,
     changePassword,
+    deleteAccount,
     isAuthenticated: !!user,
   };
 

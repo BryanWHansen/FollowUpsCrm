@@ -11,9 +11,13 @@ import CustomerDetail from "./pages/customers/CustomerDetail";
 import TemplatesList from "./pages/templates/TemplatesList";
 import FollowUpsList from "./pages/followups/FollowUpsList";
 import UserSettings from "./pages/settings/UserSettings";
+import Welcome from "./pages/Welcome";
 import PrivateRoute from "./components/PrivateRoute";
 import Layout from "./components/Layout";
 import CustomerForm from "./pages/customers/CustomerForm";
+import InteractionForm from "./pages/interactions/InteractionForm";
+import VehicleForm from "./pages/vehicles/VehicleForm";
+import InterestVehicleForm from "./pages/vehicles/InterestVehicleForm";
 
 // Material-UI theme
 const theme = createTheme({
@@ -49,12 +53,39 @@ function App() {
                 path="/customers/:customerId"
                 element={<CustomerDetail />}
               />
+              <Route
+                path="/customers/:customerId/edit"
+                element={<CustomerForm />}
+              />
+
+              {/* Interaction routes */}
+              <Route
+                path="/customers/:customerId/interaction/new"
+                element={<InteractionForm />}
+              />
+              <Route
+                path="/customers/:customerId/interaction/:interactionId/edit"
+                element={<InteractionForm />}
+              />
+
+              {/* Vehicle routes */}
+              <Route
+                path="/customers/:customerId/vehicle/new"
+                element={<VehicleForm />}
+              />
+              <Route
+                path="/customers/:customerId/interest-vehicle/new"
+                element={<InterestVehicleForm />}
+              />
 
               {/* Template routes */}
               <Route path="/templates" element={<TemplatesList />} />
 
               {/* Follow-up routes */}
               <Route path="/followups" element={<FollowUpsList />} />
+
+              {/* Welcome route */}
+              <Route path="/welcome" element={<Welcome />} />
 
               {/* Settings routes */}
               <Route path="/settings" element={<UserSettings />} />

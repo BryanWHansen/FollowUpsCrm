@@ -13,6 +13,12 @@ router.get(
   interactionController.getInteractionsWithoutVehicles,
 );
 
+// GET /api/interactions/types-without-templates - Get interaction types without templates
+router.get(
+  "/types-without-templates",
+  interactionController.getInteractionTypesWithoutTemplates,
+);
+
 // GET /api/interactions - Get all interactions (with optional filters)
 router.get("/", interactionController.getAllInteractions);
 

@@ -7,6 +7,7 @@ const {
   validateUserRegistration,
   validateUserLogin,
 } = require("../models/user.model");
+const { get } = require("../routes/auth.routes");
 
 /**
  * Register a new user
@@ -35,10 +36,13 @@ const register = async (req, res) => {
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    // Insert user
+    // Insert user with email digest defaults
     const result = await pool.query(
-      `INSERT INTO users (email, passwordHash, firstName, lastName) 
-       VALUES ($1, $2, $3, $4) 
+      `INSERT INTO users (
+        email, passwordHash, firstName, lastName,
+        emailDigestEnabled, emailDigestTime, emailDigestTimezone
+      ) 
+       VALUES ($1, $2, $3, $4, true, '08:00:00', 'America/New_York') 
        RETURNING *`,
       [email.toLowerCase(), passwordHash, firstName, lastName],
     );
@@ -94,6 +98,9 @@ const login = async (req, res) => {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
+    // Check if this is first login (lastLogin is NULL)
+    const isFirstLogin = userRow.lastlogin === null;
+
     // Update last login
     await pool.query("UPDATE users SET lastLogin = NOW() WHERE userId = $1", [
       userRow.userid,
@@ -111,6 +118,7 @@ const login = async (req, res) => {
     res.json({
       ...user,
       token,
+      isFirstLogin,
     });
   } catch (err) {
     console.error(err.message);
@@ -265,6 +273,147 @@ const changePassword = async (req, res) => {
   }
 };
 
+const updateEmailPreferences = async (req, res) => {
+  const userId = req.user.userId;
+  const { emailDigestEnabled, emailDigestTime, emailDigestTimezone } = req.body;
+
+  try {
+    // Validate inputs
+    if (
+      emailDigestTime &&
+      !/^([01]\d|2[0-3]):([0-5]\d)$/.test(emailDigestTime)
+    ) {
+      return res.status(400).json({ error: "Invalid time format. Use HH:MM" });
+    }
+
+    // Build dynamic update query
+    const updates = [];
+    const values = [];
+    let paramCount = 1;
+
+    if (emailDigestEnabled !== undefined) {
+      updates.push(`emailDigestEnabled = $${paramCount}`);
+      values.push(emailDigestEnabled);
+      paramCount++;
+    }
+
+    if (emailDigestTime !== undefined) {
+      updates.push(`emailDigestTime = $${paramCount}`);
+      values.push(emailDigestTime);
+      paramCount++;
+    }
+
+    if (emailDigestTimezone !== undefined) {
+      updates.push(`emailDigestTimezone = $${paramCount}`);
+      values.push(emailDigestTimezone);
+      paramCount++;
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: "No updates provided" });
+    }
+
+    // Add userId to values
+    values.push(userId);
+
+    const query = `
+      UPDATE users 
+      SET ${updates.join(", ")}, updatedAt = CURRENT_TIMESTAMP
+      WHERE userId = $${paramCount}
+      RETURNING userId, email, emailDigestEnabled, emailDigestTime, emailDigestTimezone
+    `;
+
+    const result = await pool.query(query, values);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({
+      message: "Email preferences updated successfully",
+      preferences: result.rows[0],
+    });
+  } catch (error) {
+    console.error("Error updating email preferences:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+// Also update getProfile or similar endpoint to include email preferences
+const getProfile = async (req, res) => {
+  const userId = req.user.userId;
+
+  try {
+    const query = `
+      SELECT userId, email, firstName, lastName, 
+             emailDigestEnabled, emailDigestTime, emailDigestTimezone,
+             createdAt, updatedAt
+      FROM users 
+      WHERE userId = $1
+    `;
+
+    const result = await pool.query(query, [userId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Error fetching profile:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+/**
+ * Delete user account and all associated data
+ */
+const deleteAccount = async (req, res) => {
+  const userId = req.user.userId;
+  const { password } = req.body;
+
+  try {
+    // Verify password before deletion
+    if (!password) {
+      return res
+        .status(400)
+        .json({ error: "Password is required to delete account" });
+    }
+
+    // Get user's current password hash
+    const userResult = await pool.query(
+      "SELECT passwordHash FROM users WHERE userId = $1",
+      [userId],
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Verify password
+    const passwordMatch = await bcrypt.compare(
+      password,
+      userResult.rows[0].passwordhash,
+    );
+
+    if (!passwordMatch) {
+      return res.status(401).json({ error: "Incorrect password" });
+    }
+
+    // Delete user - all related data will be cascade deleted
+    // This includes: customers, interactions, vehicles, followups, templates, email_digests
+    await pool.query("DELETE FROM users WHERE userId = $1", [userId]);
+
+    res.json({
+      success: true,
+      message: "Account and all associated data deleted successfully",
+    });
+  } catch (error) {
+    console.error("Error deleting account:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -272,4 +421,7 @@ module.exports = {
   getCurrentUser,
   updateUser,
   changePassword,
+  updateEmailPreferences,
+  getProfile,
+  deleteAccount,
 };

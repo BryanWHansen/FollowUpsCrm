@@ -242,10 +242,71 @@ const updateInteraction = async (req, res) => {
   }
 };
 
+/**
+ * Get interaction types that don't have any templates
+ */
+const getInteractionTypesWithoutTemplates = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    // All valid interaction types (same as in template validation)
+    const validTypes = [
+      "purchase",
+      "interest",
+      "test_drive",
+      "general_inquiry",
+    ];
+
+    // Get interaction types that have active templates for this user
+    const templatesResult = await pool.query(
+      `SELECT DISTINCT interactionType FROM followuptemplates 
+       WHERE userId = $1 AND isActive = true`,
+      [userId],
+    );
+
+    const typesWithTemplates = templatesResult.rows.map(
+      (row) => row.interactiontype,
+    );
+
+    console.log("Types with templates:", typesWithTemplates);
+    console.log("Valid types:", validTypes);
+
+    // Get count of interactions for each type
+    const interactionsResult = await pool.query(
+      `SELECT interactionType, COUNT(*) as count 
+       FROM interactions 
+       WHERE userId = $1 
+       GROUP BY interactionType`,
+      [userId],
+    );
+
+    const interactionCounts = {};
+    interactionsResult.rows.forEach((row) => {
+      interactionCounts[row.interactiontype] = parseInt(row.count);
+    });
+
+    // Find types without templates
+    const typesWithoutTemplates = validTypes
+      .filter((type) => !typesWithTemplates.includes(type))
+      .map((type) => ({
+        interactionType: type,
+        count: interactionCounts[type] || 0,
+      }));
+
+    console.log("Types without templates:", typesWithoutTemplates);
+
+    res.json(typesWithoutTemplates);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
 module.exports = {
   getAllInteractions,
   getInteractionById,
   getInteractionsWithoutVehicles,
+  getInteractionTypesWithoutTemplates,
   createInteraction,
   updateInteraction,
   deleteInteraction,
