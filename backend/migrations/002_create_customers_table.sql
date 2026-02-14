@@ -22,6 +22,6 @@ CREATE TABLE IF NOT EXISTS customers (
 );
 
 -- Create indexes for performance
-CREATE INDEX idx_customers_userid ON customers(userId);
-CREATE INDEX idx_customers_email ON customers(email);
-CREATE INDEX idx_customers_lastname ON customers(lastName);
+CREATE INDEX IF NOT EXISTS idx_customers_userid ON customers(userId);
+CREATE INDEX IF NOT EXISTS idx_customers_email ON customers(email);
+CREATE INDEX IF NOT EXISTS idx_customers_lastname ON customers(lastName);

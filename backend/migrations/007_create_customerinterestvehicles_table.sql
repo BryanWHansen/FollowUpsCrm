@@ -38,9 +38,9 @@ CREATE TABLE IF NOT EXISTS customerInterestVehicles (
 );
 
 -- Indexes for performance
-CREATE INDEX idx_interestVehicles_userId ON customerInterestVehicles(userId);
-CREATE INDEX idx_interestVehicles_customerId ON customerInterestVehicles(customerId);
-CREATE INDEX idx_interestVehicles_interactionId ON customerInterestVehicles(interactionId);
+CREATE INDEX IF NOT EXISTS idx_interestVehicles_userId ON customerInterestVehicles(userId);
+CREATE INDEX IF NOT EXISTS idx_interestVehicles_customerId ON customerInterestVehicles(customerId);
+CREATE INDEX IF NOT EXISTS idx_interestVehicles_interactionId ON customerInterestVehicles(interactionId);
 
 -- Comments
 COMMENT ON TABLE customerInterestVehicles IS 'Tracks customer interest in vehicles across varying levels of specificity';

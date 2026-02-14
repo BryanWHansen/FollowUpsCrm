@@ -22,6 +22,6 @@ CREATE TABLE IF NOT EXISTS followuptemplates (
 );
 
 -- Create indexes for performance
-CREATE INDEX idx_followuptemplates_userid ON followuptemplates(userId);
-CREATE INDEX idx_followuptemplates_type ON followuptemplates(interactionType);
-CREATE INDEX idx_followuptemplates_active ON followuptemplates(isActive);
+CREATE INDEX IF NOT EXISTS idx_followuptemplates_userid ON followuptemplates(userId);
+CREATE INDEX IF NOT EXISTS idx_followuptemplates_type ON followuptemplates(interactionType);
+CREATE INDEX IF NOT EXISTS idx_followuptemplates_active ON followuptemplates(isActive);
