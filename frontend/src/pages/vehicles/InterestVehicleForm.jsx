@@ -135,7 +135,15 @@ const InterestVehicleForm = () => {
   };
 
   const formatDate = (date) => {
-    return format(new Date(date), "MM/dd/yyyy");
+    if (!date) return "N/A";
+    try {
+      // Extract date part to avoid timezone conversion issues
+      const datePart = date.split("T")[0];
+      const [year, month, day] = datePart.split("-");
+      return `${month}/${day}/${year}`;
+    } catch {
+      return "N/A";
+    }
   };
 
   const onSubmit = async (data) => {
