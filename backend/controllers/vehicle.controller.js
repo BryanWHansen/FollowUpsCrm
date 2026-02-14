@@ -1,7 +1,10 @@
 // Vehicle controller - handles all vehicle-related business logic
 const pool = require("../db");
 const { mapToVehicle, validateVehicle } = require("../models/vehicle.model");
-const { generateFollowupsForVehicle, regenerateFollowupsForInteraction } = require("../utils/followupGenerator");
+const {
+  generateFollowupsForVehicle,
+  regenerateFollowupsForInteraction,
+} = require("../utils/followupGenerator");
 
 /**
  * Get all vehicles for the authenticated user
@@ -108,11 +111,9 @@ const createVehicle = async (req, res) => {
         [interactionId, customerId, userId],
       );
       if (interactionCheck.rows.length === 0) {
-        return res
-          .status(404)
-          .json({
-            error: "Interaction not found or does not belong to this customer",
-          });
+        return res.status(404).json({
+          error: "Interaction not found or does not belong to this customer",
+        });
       }
       interactionType = interactionCheck.rows[0].interactiontype;
       interactionDate = interactionCheck.rows[0].interactiondate;
@@ -120,9 +121,15 @@ const createVehicle = async (req, res) => {
 
     await client.query("BEGIN");
 
+    // Ensure purchaseDate is in YYYY-MM-DD format (no timezone conversion)
+    let purchaseDateToStore = purchaseDate;
+    if (purchaseDate && typeof purchaseDate === "string") {
+      purchaseDateToStore = purchaseDate.split("T")[0];
+    }
+
     const result = await client.query(
       `INSERT INTO purchasedvehicles (userId, customerId, interactionId, make, model, year, purchaseDate, salePrice, vin, color, mileage, notes) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7::date, $8, $9, $10, $11, $12) 
        RETURNING *`,
       [
         userId,
@@ -131,7 +138,7 @@ const createVehicle = async (req, res) => {
         make,
         model,
         year,
-        purchaseDate || null,
+        purchaseDateToStore || null,
         salePrice || null,
         vin || null,
         color || null,
@@ -251,21 +258,25 @@ const updateVehicle = async (req, res) => {
         [interactionId, customerId, userId],
       );
       if (interactionCheck.rows.length === 0) {
-        return res
-          .status(404)
-          .json({
-            error: "Interaction not found or does not belong to this customer",
-          });
+        return res.status(404).json({
+          error: "Interaction not found or does not belong to this customer",
+        });
       }
     }
 
     const client = await pool.connect();
-    await client.query('BEGIN');
+    await client.query("BEGIN");
+
+    // Ensure purchaseDate is in YYYY-MM-DD format (no timezone conversion)
+    let purchaseDateToStore = purchaseDate;
+    if (purchaseDate && typeof purchaseDate === "string") {
+      purchaseDateToStore = purchaseDate.split("T")[0];
+    }
 
     const result = await client.query(
       `UPDATE purchasedvehicles 
        SET customerid = $1, interactionid = $2, make = $3, model = $4, year = $5, 
-           purchasedate = $6, saleprice = $7, vin = $8, color = $9, mileage = $10, notes = $11
+           purchasedate = $6::date, saleprice = $7, vin = $8, color = $9, mileage = $10, notes = $11
        WHERE vehicleid = $12 AND userid = $13
        RETURNING *`,
       [
@@ -274,7 +285,7 @@ const updateVehicle = async (req, res) => {
         make,
         model,
         year,
-        purchaseDate || null,
+        purchaseDateToStore || null,
         salePrice || null,
         vin || null,
         color || null,
@@ -290,7 +301,7 @@ const updateVehicle = async (req, res) => {
       await regenerateFollowupsForInteraction(client, interactionId, userId);
     }
 
-    await client.query('COMMIT');
+    await client.query("COMMIT");
     client.release();
 
     const updatedVehicle = mapToVehicle(result.rows[0]);

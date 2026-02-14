@@ -6,7 +6,9 @@ const {
 } = require("../models/interaction.model");
 const { mapToTemplate } = require("../models/template.model");
 const { mapToFollowUp, renderTemplate } = require("../models/followup.model");
-const { regenerateFollowupsForInteraction } = require("../utils/followupGenerator");
+const {
+  regenerateFollowupsForInteraction,
+} = require("../utils/followupGenerator");
 
 /**
  * Get all interactions for the authenticated user
@@ -154,14 +156,22 @@ const createInteraction = async (req, res) => {
       return res.status(404).json({ error: "Customer not found" });
     }
 
-    // Insert interaction
+    // Ensure interactionDate is in YYYY-MM-DD format (no timezone conversion)
+    // If it's already a string in that format, keep it as-is
+    let dateToStore = interactionDate;
+    if (interactionDate && typeof interactionDate === "string") {
+      // Extract just the date part if there's any time component
+      dateToStore = interactionDate.split("T")[0];
+    }
+
+    // Insert interaction - use explicit DATE casting to prevent timezone conversion
     const result = await pool.query(
       `
       INSERT INTO interactions (userId, customerId, interactionType, interactionDate, notes)
-      VALUES ($1, $2, $3, $4, $5)
+      VALUES ($1, $2, $3, $4::date, $5)
       RETURNING *
     `,
-      [userId, customerId, interactionType, interactionDate, notes],
+      [userId, customerId, interactionType, dateToStore, notes],
     );
 
     const newInteraction = mapToInteraction(result.rows[0]);
@@ -203,8 +213,8 @@ const deleteInteraction = async (req, res) => {
 const updateInteraction = async (req, res) => {
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
-    
+    await client.query("BEGIN");
+
     const { id } = req.params;
     const userId = req.user.userId;
 
@@ -212,7 +222,7 @@ const updateInteraction = async (req, res) => {
 
     const validation = validateInteraction(interaction);
     if (!validation.isValid) {
-      await client.query('ROLLBACK');
+      await client.query("ROLLBACK");
       return res.status(400).json({ errors: validation.errors });
     }
 
@@ -226,29 +236,35 @@ const updateInteraction = async (req, res) => {
     );
 
     if (checkResult.rows.length === 0) {
-      await client.query('ROLLBACK');
+      await client.query("ROLLBACK");
       return res.status(404).json({ error: "Interaction not found" });
     }
 
     const { interactionType, interactionDate, notes } = interaction;
 
+    // Ensure interactionDate is in YYYY-MM-DD format (no timezone conversion)
+    let dateToStore = interactionDate;
+    if (interactionDate && typeof interactionDate === "string") {
+      dateToStore = interactionDate.split("T")[0];
+    }
+
     const result = await client.query(
       `UPDATE interactions 
-       SET interactionType = $1, interactionDate = $2, notes = $3
+       SET interactionType = $1, interactionDate = $2::date, notes = $3
        WHERE interactionId = $4 AND userId = $5
        RETURNING *`,
-      [interactionType, interactionDate, notes || null, id, userId],
+      [interactionType, dateToStore, notes || null, id, userId],
     );
 
     // Regenerate follow-ups with updated interaction info
     await regenerateFollowupsForInteraction(client, id, userId);
-    
-    await client.query('COMMIT');
+
+    await client.query("COMMIT");
 
     const updatedInteraction = mapToInteraction(result.rows[0]);
     res.json(updatedInteraction);
   } catch (err) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
     console.error(err.message);
     res.status(500).json({ error: "Server error" });
   } finally {
