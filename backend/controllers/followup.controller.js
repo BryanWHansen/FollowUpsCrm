@@ -199,7 +199,7 @@ const updateTemplate = async (req, res) => {
       LEFT JOIN customerinterestvehicles civ ON civ.interactionId = f.interactionId
       WHERE f.templateId = $1 
         AND f.userId = $2 
-        AND f.status = 'pending'
+        AND f.status IN ('pending', 'sent')
     `,
       [id, userId],
     );
@@ -438,7 +438,7 @@ const getUpcomingFollowUps = async (req, res) => {
       JOIN interactions i ON f.interactionId = i.interactionId
       LEFT JOIN purchasedvehicles v ON i.interactionid = v.interactionid
       WHERE f.userId = $1 
-        AND f.status = 'pending'
+        AND f.status IN ('pending', 'sent')
         AND f.scheduledDate >= CURRENT_DATE
         AND f.scheduledDate <= CURRENT_DATE + INTERVAL '${parseInt(days)} days'
       ORDER BY f.scheduledDate ASC, c.lastName ASC, c.firstName ASC

@@ -1,25 +1,19 @@
-const nodemailer = require("nodemailer");
+const sgMail = require("@sendgrid/mail");
 
 /**
  * Email service for sending follow-up digest emails with SMS deep links
+ * Using SendGrid API for reliable email delivery
  */
 
-// Create reusable transporter
-let transporter = null;
+// Initialize SendGrid with API key
+let isConfigured = false;
 
-function createTransporter() {
-  if (!transporter) {
-    transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST,
-      port: parseInt(process.env.EMAIL_PORT),
-      secure: false, // true for 465, false for other ports
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD,
-      },
-    });
+function initializeSendGrid() {
+  if (!isConfigured && process.env.SENDGRID_API_KEY) {
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+    isConfigured = true;
   }
-  return transporter;
+  return isConfigured;
 }
 
 /**
@@ -160,42 +154,60 @@ function generateEmailHTML(userName, followups, date) {
 }
 
 /**
- * Send daily digest email to a user
+ * Send daily digest email to a user using SendGrid
  * @param {string} userEmail - User's email address
  * @param {string} userName - User's first name
  * @param {Array} followups - Array of follow-up objects with customerName, customerPhone, messageBody
- * @returns {Promise<Object>} - Nodemailer send result
+ * @returns {Promise<Object>} - SendGrid send result
  */
 async function sendDailyDigest(userEmail, userName, followups) {
-  const transporter = createTransporter();
+  initializeSendGrid();
+
+  if (!isConfigured) {
+    throw new Error("SendGrid API key not configured");
+  }
+
   const today = new Date();
 
-  const mailOptions = {
-    from: process.env.EMAIL_FROM,
+  const msg = {
     to: userEmail,
+    from: process.env.EMAIL_FROM || "noreply@example.com",
     subject: `Your Follow-Ups for Today (${followups.length})`,
     html: generateEmailHTML(userName, followups, today),
   };
 
   try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`✅ Digest email sent to ${userEmail}: ${info.messageId}`);
-    return { success: true, messageId: info.messageId };
+    const response = await sgMail.send(msg);
+    console.log(`✅ Digest email sent to ${userEmail} via SendGrid`);
+    return { success: true, messageId: response[0].headers["x-message-id"] };
   } catch (error) {
     console.error(`❌ Failed to send digest to ${userEmail}:`, error.message);
+    if (error.response) {
+      console.error("SendGrid error details:", error.response.body);
+    }
     throw error;
   }
 }
 
 /**
- * Test email configuration
+ * Test email configuration with SendGrid
  * @returns {Promise<boolean>} - True if configuration is valid
  */
 async function testEmailConfig() {
   try {
-    const transporter = createTransporter();
-    await transporter.verify();
-    console.log("✅ Email configuration is valid");
+    initializeSendGrid();
+
+    if (!process.env.SENDGRID_API_KEY) {
+      console.error("❌ SENDGRID_API_KEY not set");
+      return false;
+    }
+
+    if (!process.env.EMAIL_FROM) {
+      console.error("❌ EMAIL_FROM not set");
+      return false;
+    }
+
+    console.log("✅ SendGrid email configuration is valid");
     return true;
   } catch (error) {
     console.error("❌ Email configuration error:", error.message);
