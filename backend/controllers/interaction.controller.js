@@ -256,8 +256,19 @@ const updateInteraction = async (req, res) => {
       [interactionType, dateToStore, notes || null, id, userId],
     );
 
-    // Regenerate follow-ups with updated interaction info
-    await regenerateFollowupsForInteraction(client, id, userId);
+    // Check if this interaction has an associated vehicle (purchased or interest)
+    const vehicleCheck = await client.query(
+      `SELECT 1 FROM purchasedvehicles WHERE interactionId = $1
+       UNION ALL
+       SELECT 1 FROM customerinterestvehicles WHERE interactionId = $1
+       LIMIT 1`,
+      [id],
+    );
+
+    // Only regenerate follow-ups if the interaction has a vehicle
+    if (vehicleCheck.rows.length > 0) {
+      await regenerateFollowupsForInteraction(client, id, userId);
+    }
 
     await client.query("COMMIT");
 
