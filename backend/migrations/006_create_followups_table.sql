@@ -31,9 +31,9 @@ CREATE TABLE IF NOT EXISTS followups (
 );
 
 -- Create indexes for performance
-CREATE INDEX idx_followups_userid ON followups(userId);
-CREATE INDEX idx_followups_customerid ON followups(customerId);
-CREATE INDEX idx_followups_interactionid ON followups(interactionId);
-CREATE INDEX idx_followups_templateid ON followups(templateId);
-CREATE INDEX idx_followups_status ON followups(status);
-CREATE INDEX idx_followups_scheduleddate ON followups(scheduledDate);
+CREATE INDEX IF NOT EXISTS idx_followups_userid ON followups(userId);
+CREATE INDEX IF NOT EXISTS idx_followups_customerid ON followups(customerId);
+CREATE INDEX IF NOT EXISTS idx_followups_interactionid ON followups(interactionId);
+CREATE INDEX IF NOT EXISTS idx_followups_templateid ON followups(templateId);
+CREATE INDEX IF NOT EXISTS idx_followups_status ON followups(status);
+CREATE INDEX IF NOT EXISTS idx_followups_scheduleddate ON followups(scheduledDate);

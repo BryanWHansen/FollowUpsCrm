@@ -25,6 +25,6 @@ CREATE TABLE IF NOT EXISTS purchasedvehicles (
 );
 
 -- Create indexes for performance
-CREATE INDEX idx_purchasedvehicles_userid ON purchasedvehicles(userId);
-CREATE INDEX idx_purchasedvehicles_customerid ON purchasedvehicles(customerId);
-CREATE INDEX idx_purchasedvehicles_vin ON purchasedvehicles(vin);
+CREATE INDEX IF NOT EXISTS idx_purchasedvehicles_userid ON purchasedvehicles(userId);
+CREATE INDEX IF NOT EXISTS idx_purchasedvehicles_customerid ON purchasedvehicles(customerId);
+CREATE INDEX IF NOT EXISTS idx_purchasedvehicles_vin ON purchasedvehicles(vin);

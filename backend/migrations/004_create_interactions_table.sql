@@ -21,8 +21,8 @@ CREATE TABLE IF NOT EXISTS interactions (
 );
 
 -- Create indexes for performance
-CREATE INDEX idx_interactions_userid ON interactions(userId);
-CREATE INDEX idx_interactions_customerid ON interactions(customerId);
-CREATE INDEX idx_interactions_vehicleid ON interactions(vehicleId);
-CREATE INDEX idx_interactions_type ON interactions(interactionType);
-CREATE INDEX idx_interactions_date ON interactions(interactionDate);
+CREATE INDEX IF NOT EXISTS idx_interactions_userid ON interactions(userId);
+CREATE INDEX IF NOT EXISTS idx_interactions_customerid ON interactions(customerId);
+CREATE INDEX IF NOT EXISTS idx_interactions_vehicleid ON interactions(vehicleId);
+CREATE INDEX IF NOT EXISTS idx_interactions_type ON interactions(interactionType);
+CREATE INDEX IF NOT EXISTS idx_interactions_date ON interactions(interactionDate);
