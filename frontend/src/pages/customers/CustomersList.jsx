@@ -81,7 +81,10 @@ const CustomersList = () => {
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
     try {
-      return format(new Date(dateString), "MM/dd/yyyy");
+      // Extract date part to avoid timezone conversion issues
+      const datePart = dateString.split("T")[0];
+      const [year, month, day] = datePart.split("-");
+      return `${month}/${day}/${year}`;
     } catch {
       return "N/A";
     }

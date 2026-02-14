@@ -67,22 +67,38 @@ const FollowUpsList = () => {
   };
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
+    if (!dateString) return "N/A";
+    try {
+      // Extract date part to avoid timezone conversion issues
+      const datePart = dateString.split("T")[0];
+      const [year, month, day] = datePart.split("-");
+      const date = new Date(year, month - 1, day);
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    } catch {
+      return "N/A";
+    }
   };
 
   const formatDateLong = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
+    if (!dateString) return "N/A";
+    try {
+      // Extract date part to avoid timezone conversion issues
+      const datePart = dateString.split("T")[0];
+      const [year, month, day] = datePart.split("-");
+      const date = new Date(year, month - 1, day);
+      return date.toLocaleDateString("en-US", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      });
+    } catch {
+      return "N/A";
+    }
   };
 
   const isOverdue = (dateString) => {
