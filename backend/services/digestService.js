@@ -105,6 +105,37 @@ async function recordDigestSent(
 }
 
 /**
+ * Update follow-up statuses to 'sent' after email is delivered
+ * @param {Array} followups - Array of follow-up objects with followupId
+ * @returns {Promise<number>} - Number of follow-ups updated
+ */
+async function updateFollowupsToSent(followups) {
+  if (!followups || followups.length === 0) {
+    return 0;
+  }
+
+  // Extract followup IDs from the followups array
+  const followupIds = followups.map((f) => f.followupId || f.followupid);
+
+  const query = `
+    UPDATE followups 
+    SET status = 'sent'
+    WHERE followupId = ANY($1)
+      AND status = 'pending'
+    RETURNING followupId
+  `;
+
+  try {
+    const result = await pool.query(query, [followupIds]);
+    console.log(`✅ Updated ${result.rowCount} follow-ups to 'sent' status`);
+    return result.rowCount;
+  } catch (error) {
+    console.error("Error updating follow-up statuses:", error);
+    throw error;
+  }
+}
+
+/**
  * Process and send digest email for a user
  * @param {Object} user - User object with email, name, and follow-ups
  * @returns {Promise<boolean>} - True if sent successfully
@@ -132,6 +163,9 @@ async function processUserDigest(user) {
     const name = firstName || "there";
     await sendDailyDigest(email, name, followups);
 
+    // Update follow-up statuses to 'sent'
+    await updateFollowupsToSent(followups);
+
     // Record success
     await recordDigestSent(userId, followups.length, "sent");
 
@@ -150,5 +184,6 @@ module.exports = {
   getUsersWithFollowups,
   wasDigestSentToday,
   recordDigestSent,
+  updateFollowupsToSent,
   processUserDigest,
 };

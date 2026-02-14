@@ -270,7 +270,11 @@ const FollowUpsList = () => {
                           color={
                             followup.status === "pending"
                               ? "warning"
-                              : "default"
+                              : followup.status === "sent"
+                                ? "info"
+                                : followup.status === "completed"
+                                  ? "success"
+                                  : "default"
                           }
                           size="small"
                         />
