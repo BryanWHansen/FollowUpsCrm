@@ -1,7 +1,7 @@
 // Interest Vehicle controller - handles customer vehicle interests
 const pool = require('../db');
 const { mapToInterestVehicle, validateInterestVehicle } = require('../models/interestVehicle.model');
-const { generateFollowupsForVehicle } = require('../utils/followupGenerator');
+const { generateFollowupsForVehicle, regenerateFollowupsForInteraction } = require('../utils/followupGenerator');
 
 /**
  * Get all interest vehicles for the authenticated user
@@ -133,20 +133,26 @@ const createInterestVehicle = async (req, res) => {
  * Update an interest vehicle
  */
 const updateInterestVehicle = async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+    
     const { id } = req.params;
     const userId = req.user.userId;
     const updates = req.body;
     
-    // Verify interest vehicle belongs to user
-    const checkResult = await pool.query(
-      'SELECT * FROM customerinterestvehicles WHERE interestVehicleId = $1 AND userId = $2',
+    // Verify interest vehicle belongs to user and get interactionId
+    const checkResult = await client.query(
+      'SELECT interactionId FROM customerinterestvehicles WHERE interestVehicleId = $1 AND userId = $2',
       [id, userId]
     );
     
     if (checkResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Interest vehicle not found' });
     }
+    
+    const interactionId = checkResult.rows[0].interactionid;
     
     // Build update query dynamically
     const allowedFields = ['make', 'model', 'year', 'color', 'trim', 'vehicleType', 'notes'];
@@ -163,23 +169,34 @@ const updateInterestVehicle = async (req, res) => {
     });
     
     if (updateFields.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ error: 'No valid fields to update' });
     }
     
     values.push(id, userId);
     
-    const result = await pool.query(`
+    const result = await client.query(`
       UPDATE customerinterestvehicles 
       SET ${updateFields.join(', ')}, updatedAt = CURRENT_TIMESTAMP
       WHERE interestVehicleId = $${paramCount} AND userId = $${paramCount + 1}
       RETURNING *
     `, values);
     
+    // Regenerate follow-ups if interest vehicle has an interaction
+    if (interactionId) {
+      await regenerateFollowupsForInteraction(client, interactionId, userId);
+    }
+    
+    await client.query('COMMIT');
+    
     const updatedInterestVehicle = mapToInterestVehicle(result.rows[0]);
     res.json(updatedInterestVehicle);
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error(err.message);
     res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 };
 

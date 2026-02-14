@@ -1,7 +1,7 @@
 // Vehicle controller - handles all vehicle-related business logic
 const pool = require("../db");
 const { mapToVehicle, validateVehicle } = require("../models/vehicle.model");
-const { generateFollowupsForVehicle } = require("../utils/followupGenerator");
+const { generateFollowupsForVehicle, regenerateFollowupsForInteraction } = require("../utils/followupGenerator");
 
 /**
  * Get all vehicles for the authenticated user
@@ -259,7 +259,10 @@ const updateVehicle = async (req, res) => {
       }
     }
 
-    const result = await pool.query(
+    const client = await pool.connect();
+    await client.query('BEGIN');
+
+    const result = await client.query(
       `UPDATE purchasedvehicles 
        SET customerid = $1, interactionid = $2, make = $3, model = $4, year = $5, 
            purchasedate = $6, saleprice = $7, vin = $8, color = $9, mileage = $10, notes = $11
@@ -281,6 +284,14 @@ const updateVehicle = async (req, res) => {
         userId,
       ],
     );
+
+    // Regenerate follow-ups if vehicle has an interaction
+    if (interactionId) {
+      await regenerateFollowupsForInteraction(client, interactionId, userId);
+    }
+
+    await client.query('COMMIT');
+    client.release();
 
     const updatedVehicle = mapToVehicle(result.rows[0]);
     res.json(updatedVehicle);

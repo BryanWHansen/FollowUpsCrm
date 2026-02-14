@@ -6,6 +6,7 @@ const {
 } = require("../models/interaction.model");
 const { mapToTemplate } = require("../models/template.model");
 const { mapToFollowUp, renderTemplate } = require("../models/followup.model");
+const { regenerateFollowupsForInteraction } = require("../utils/followupGenerator");
 
 /**
  * Get all interactions for the authenticated user
@@ -200,7 +201,10 @@ const deleteInteraction = async (req, res) => {
  * Update an interaction
  */
 const updateInteraction = async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+    
     const { id } = req.params;
     const userId = req.user.userId;
 
@@ -208,11 +212,12 @@ const updateInteraction = async (req, res) => {
 
     const validation = validateInteraction(interaction);
     if (!validation.isValid) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ errors: validation.errors });
     }
 
     // Check ownership and get customer to verify it belongs to user
-    const checkResult = await pool.query(
+    const checkResult = await client.query(
       `SELECT i.interactionId 
        FROM interactions i
        JOIN customers c ON i.customerId = c.customerId
@@ -221,12 +226,13 @@ const updateInteraction = async (req, res) => {
     );
 
     if (checkResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: "Interaction not found" });
     }
 
     const { interactionType, interactionDate, notes } = interaction;
 
-    const result = await pool.query(
+    const result = await client.query(
       `UPDATE interactions 
        SET interactionType = $1, interactionDate = $2, notes = $3
        WHERE interactionId = $4 AND userId = $5
@@ -234,11 +240,19 @@ const updateInteraction = async (req, res) => {
       [interactionType, interactionDate, notes || null, id, userId],
     );
 
+    // Regenerate follow-ups with updated interaction info
+    await regenerateFollowupsForInteraction(client, id, userId);
+    
+    await client.query('COMMIT');
+
     const updatedInteraction = mapToInteraction(result.rows[0]);
     res.json(updatedInteraction);
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error(err.message);
     res.status(500).json({ error: "Server error" });
+  } finally {
+    client.release();
   }
 };
 

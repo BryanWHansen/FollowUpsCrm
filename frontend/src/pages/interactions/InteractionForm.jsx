@@ -50,7 +50,11 @@ const InteractionForm = () => {
     mode: "onBlur",
     reValidateMode: "onChange",
     defaultValues: {
-      interactionDate: new Date().toISOString().split("T")[0],
+      interactionDate: new Date(
+        new Date().getTime() - new Date().getTimezoneOffset() * 60000,
+      )
+        .toISOString()
+        .split("T")[0],
     },
   });
 

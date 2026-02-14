@@ -111,6 +111,100 @@ const generateFollowupsForVehicle = async (client, params) => {
   return generatedFollowups;
 };
 
+/**
+ * Regenerate follow-ups for an interaction by deleting pending/sent ones and creating new ones
+ * @param {Object} client - Database client (for transaction)
+ * @param {number} interactionId - Interaction ID
+ * @param {number} userId - User ID
+ * @returns {Promise<Array>} Array of regenerated follow-ups
+ */
+const regenerateFollowupsForInteraction = async (client, interactionId, userId) => {
+  console.log(`Regenerating follow-ups for interaction ${interactionId}`);
+
+  // Get interaction details
+  const interactionResult = await client.query(
+    `SELECT i.*, c.customerId 
+     FROM interactions i
+     JOIN customers c ON i.customerId = c.customerId
+     WHERE i.interactionId = $1 AND i.userId = $2`,
+    [interactionId, userId]
+  );
+
+  if (interactionResult.rows.length === 0) {
+    console.log(`Interaction ${interactionId} not found`);
+    return [];
+  }
+
+  const interaction = interactionResult.rows[0];
+
+  // Delete existing pending and sent follow-ups for this interaction
+  const deleteResult = await client.query(
+    `DELETE FROM followups 
+     WHERE interactionId = $1 AND userId = $2 AND status IN ('pending', 'sent')
+     RETURNING followupId`,
+    [interactionId, userId]
+  );
+
+  console.log(`Deleted ${deleteResult.rowCount} pending/sent follow-ups for interaction ${interactionId}`);
+
+  // Get vehicle info if it exists (check both purchased vehicles and interest vehicles)
+  const vehicleResult = await client.query(
+    `SELECT make, model, year FROM purchasedvehicles 
+     WHERE interactionId = $1
+     UNION ALL
+     SELECT make, model, year FROM customerinterestvehicles 
+     WHERE interactionId = $1
+     LIMIT 1`,
+    [interactionId]
+  );
+
+  const vehicle = vehicleResult.rows[0] || {};
+
+  // Regenerate follow-ups
+  const newFollowups = await generateFollowupsForVehicle(client, {
+    userId,
+    customerId: interaction.customerid,
+    interactionId,
+    interactionType: interaction.interactiontype,
+    interactionDate: interaction.interactiondate,
+    vehicleMake: vehicle.make || '',
+    vehicleModel: vehicle.model || '',
+    vehicleYear: vehicle.year || '',
+  });
+
+  console.log(`Regenerated ${newFollowups.length} follow-ups for interaction ${interactionId}`);
+  return newFollowups;
+};
+
+/**
+ * Regenerate follow-ups for all interactions of a customer
+ * @param {Object} client - Database client (for transaction)
+ * @param {number} customerId - Customer ID
+ * @param {number} userId - User ID
+ * @returns {Promise<number>} Number of interactions processed
+ */
+const regenerateFollowupsForCustomer = async (client, customerId, userId) => {
+  console.log(`Regenerating follow-ups for customer ${customerId}`);
+
+  // Get all interactions for this customer
+  const interactionsResult = await client.query(
+    `SELECT interactionId FROM interactions 
+     WHERE customerId = $1 AND userId = $2`,
+    [customerId, userId]
+  );
+
+  let count = 0;
+  for (const row of interactionsResult.rows) {
+    await regenerateFollowupsForInteraction(client, row.interactionid, userId);
+    count++;
+  }
+
+  console.log(`Regenerated follow-ups for ${count} interactions for customer ${customerId}`);
+  return count;
+};
+
 module.exports = {
   generateFollowupsForVehicle,
+  regenerateFollowupsForInteraction,
+  regenerateFollowupsForCustomer,
 };
