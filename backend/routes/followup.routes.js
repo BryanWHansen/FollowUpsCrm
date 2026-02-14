@@ -36,6 +36,9 @@ router.delete("/templates/:id", followupController.deleteTemplate);
 // GET /api/followups/upcoming - Get upcoming follow-ups (next N days)
 router.get("/upcoming", followupController.getUpcomingFollowUps);
 
+// POST /api/followups/send-digest - Manually send digest for today's pending follow-ups
+router.post("/send-digest", followupController.sendDigestNow);
+
 // GET /api/followups - Get all follow-ups
 router.get("/", followupController.getAllFollowUps);
 

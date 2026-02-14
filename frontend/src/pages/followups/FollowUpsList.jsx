@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { styled } from "@mui/material/styles";
 import {
   Box,
   Typography,
@@ -12,13 +11,14 @@ import {
   Link as MuiLink,
   Grid,
   IconButton,
+  Button,
+  Snackbar,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from "@mui/material";
-import MuiAccordion from "@mui/material/Accordion";
-import MuiAccordionSummary, {
-  accordionSummaryClasses,
-} from "@mui/material/AccordionSummary";
-import MuiAccordionDetails from "@mui/material/AccordionDetails";
 import ArrowForwardIosSharpIcon from "@mui/icons-material/ArrowForwardIosSharp";
+import EmailIcon from "@mui/icons-material/Email";
 import { Link } from "react-router-dom";
 import { followupAPI } from "../../api/endpoints";
 import {
@@ -26,51 +26,18 @@ import {
   getInteractionTypeColor,
 } from "../../utils/interactionTypes";
 
-// Styled Accordion Components
-const Accordion = styled((props) => (
-  <MuiAccordion disableGutters elevation={0} square {...props} />
-))(({ theme }) => ({
-  border: `1px solid ${theme.palette.divider}`,
-  "&:not(:last-child)": {
-    borderBottom: 0,
-  },
-  "&::before": {
-    display: "none",
-  },
-}));
-
-const AccordionSummary = styled((props) => (
-  <MuiAccordionSummary
-    expandIcon={<ArrowForwardIosSharpIcon sx={{ fontSize: "0.9rem" }} />}
-    {...props}
-  />
-))(({ theme }) => ({
-  backgroundColor: "transparent",
-  flexDirection: "row-reverse",
-  [`& .${accordionSummaryClasses.expandIconWrapper}.${accordionSummaryClasses.expanded}`]:
-    {
-      transform: "rotate(90deg)",
-    },
-  [`& .${accordionSummaryClasses.content}`]: {
-    marginLeft: theme.spacing(1),
-  },
-}));
-
-const AccordionDetails = styled(MuiAccordionDetails)(({ theme }) => ({
-  padding: theme.spacing(2),
-  borderTop: "1px solid rgba(0, 0, 0, .125)",
-  backgroundColor: "rgba(0, 0, 0, .03)",
-  ...theme.applyStyles("dark", {
-    backgroundColor: "rgba(255, 255, 255, .05)",
-  }),
-}));
-
 const FollowUpsList = () => {
   const [searchParams] = useSearchParams();
   const [followups, setFollowups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expanded, setExpanded] = useState(false);
+  const [sendingDigest, setSendingDigest] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
   const selectedDate = searchParams.get("date");
 
@@ -135,6 +102,42 @@ const FollowUpsList = () => {
     setExpanded(newExpanded ? panel : false);
   };
 
+  const handleSendDigest = async () => {
+    try {
+      setSendingDigest(true);
+      const response = await followupAPI.sendDigest();
+      setSnackbar({
+        open: true,
+        message: response.data.message,
+        severity: "success",
+      });
+      // Refresh the list to show updated statuses
+      fetchFollowups();
+    } catch (err) {
+      console.error("Error sending digest:", err);
+      const errorMessage =
+        err.response?.data?.message || "Failed to send digest email";
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: err.response?.status === 404 ? "info" : "error",
+      });
+    } finally {
+      setSendingDigest(false);
+    }
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
+  const isTodaySelected = () => {
+    if (!selectedDate) return false;
+    const today = new Date();
+    const selected = new Date(selectedDate);
+    return selected.toDateString() === today.toDateString();
+  };
+
   if (loading) {
     return (
       <Box
@@ -150,10 +153,30 @@ const FollowUpsList = () => {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
-        Follow-Ups
-        {selectedDate && ` - ${formatDateLong(selectedDate)}`}
-      </Typography>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 2,
+        }}
+      >
+        <Typography variant="h4">
+          Follow-Ups
+          {selectedDate && ` - ${formatDateLong(selectedDate)}`}
+        </Typography>
+        {isTodaySelected() && (
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<EmailIcon />}
+            onClick={handleSendDigest}
+            disabled={sendingDigest}
+          >
+            {sendingDigest ? "Sending..." : "Send Digest Now"}
+          </Button>
+        )}
+      </Box>
 
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
@@ -209,7 +232,18 @@ const FollowUpsList = () => {
                   onChange={handleAccordionChange(
                     `followup-${followup.followupId}`,
                   )}
+                  disableGutters
+                  elevation={0}
+                  square
                   sx={{
+                    border: "1px solid",
+                    borderColor: "divider",
+                    "&:not(:last-child)": {
+                      borderBottom: 0,
+                    },
+                    "&::before": {
+                      display: "none",
+                    },
                     backgroundColor: isToday(followup.scheduledDate)
                       ? "warning.lighter"
                       : isOverdue(followup.scheduledDate)
@@ -218,8 +252,20 @@ const FollowUpsList = () => {
                   }}
                 >
                   <AccordionSummary
+                    expandIcon={
+                      <ArrowForwardIosSharpIcon sx={{ fontSize: "0.9rem" }} />
+                    }
                     aria-controls={`followup-${followup.followupId}-content`}
                     id={`followup-${followup.followupId}-header`}
+                    sx={{
+                      flexDirection: "row-reverse",
+                      "& .MuiAccordionSummary-expandIconWrapper.Mui-expanded": {
+                        transform: "rotate(90deg)",
+                      },
+                      "& .MuiAccordionSummary-content": {
+                        marginLeft: 1,
+                      },
+                    }}
                   >
                     <Grid
                       container
@@ -293,7 +339,13 @@ const FollowUpsList = () => {
                       </Grid>
                     </Grid>
                   </AccordionSummary>
-                  <AccordionDetails>
+                  <AccordionDetails
+                    sx={{
+                      p: 2,
+                      borderTop: "1px solid rgba(0, 0, 0, .125)",
+                      backgroundColor: "rgba(0, 0, 0, .03)",
+                    }}
+                  >
                     {followup.messageSubject && (
                       <>
                         <Typography
@@ -335,6 +387,21 @@ const FollowUpsList = () => {
           )}
         </CardContent>
       </Card>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+          sx={{ width: "100%" }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

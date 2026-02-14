@@ -61,6 +61,7 @@ export const followupAPI = {
   dismiss: (id) => api.put(`/api/followups/${id}/dismiss`),
   snooze: (id, data) => api.put(`/api/followups/${id}/snooze`, data),
   delete: (id) => api.delete(`/api/followups/${id}`),
+  sendDigest: () => api.post("/api/followups/send-digest"),
 };
 
 // Interest Vehicle API

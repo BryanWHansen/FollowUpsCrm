@@ -1,6 +1,7 @@
 // Customer controller - handles all customer-related business logic
 const pool = require('../db');
 const { mapToCustomer, validateCustomer } = require('../models/customer.model');
+const { regenerateFollowupsForCustomer } = require('../utils/followupGenerator');
 
 /**
  * Get all customers for the authenticated user
@@ -113,7 +114,10 @@ const deleteCustomer = async (req, res) => {
  * Update a customer
  */
 const updateCustomer = async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
+    
     const { id } = req.params;
     const userId = req.user.userId;
     
@@ -122,22 +126,24 @@ const updateCustomer = async (req, res) => {
     
     const validation = validateCustomer(customer);
     if (!validation.isValid) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ errors: validation.errors });
     }
     
     // Check ownership
-    const checkResult = await pool.query(
+    const checkResult = await client.query(
       'SELECT customerId FROM customers WHERE customerId = $1 AND userId = $2',
       [id, userId]
     );
     
     if (checkResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Customer not found' });
     }
     
     const { firstName, lastName, preferredName, birthday, phoneNumber, address, email, notes } = customer;
     
-    const result = await pool.query(
+    const result = await client.query(
       `UPDATE customers 
        SET firstName = $1, lastName = $2, preferredName = $3, birthday = $4, 
            phoneNumber = $5, address = $6, email = $7, notes = $8, updatedAt = CURRENT_TIMESTAMP
@@ -146,11 +152,19 @@ const updateCustomer = async (req, res) => {
       [firstName, lastName, preferredName || null, birthday || null, phoneNumber || null, address || null, email || null, notes || null, id, userId]
     );
     
+    // Regenerate follow-ups with updated customer info
+    await regenerateFollowupsForCustomer(client, id, userId);
+    
+    await client.query('COMMIT');
+    
     const updatedCustomer = mapToCustomer(result.rows[0]);
     res.json(updatedCustomer);
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error(err.message);
     res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
   }
 };
 

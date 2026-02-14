@@ -10,6 +10,7 @@ const {
   validateFollowUpUpdate,
   renderTemplate,
 } = require("../models/followup.model");
+const { sendManualDigest } = require("../services/digestService");
 
 // ============================================
 // TEMPLATE CONTROLLERS
@@ -615,6 +616,45 @@ const deleteFollowUp = async (req, res) => {
   }
 };
 
+/**
+ * Manually send digest email for today's pending follow-ups
+ */
+const sendDigestNow = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const userEmail = req.user.email;
+
+    // Fetch user's firstName from database
+    const userResult = await pool.query(
+      "SELECT firstName FROM users WHERE userId = $1",
+      [userId],
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const userFirstName = userResult.rows[0].firstname;
+
+    const result = await sendManualDigest(userId, userEmail, userFirstName);
+
+    if (result.success) {
+      res.json({
+        message: result.message,
+        followupCount: result.followupCount,
+      });
+    } else {
+      res.status(404).json({
+        message: result.message,
+        followupCount: result.followupCount,
+      });
+    }
+  } catch (err) {
+    console.error("Error sending manual digest:", err.message);
+    res.status(500).json({ error: "Failed to send digest email" });
+  }
+};
+
 module.exports = {
   // Template controllers
   getAllTemplates,
@@ -631,4 +671,5 @@ module.exports = {
   dismissFollowUp,
   snoozeFollowUp,
   deleteFollowUp,
+  sendDigestNow,
 };

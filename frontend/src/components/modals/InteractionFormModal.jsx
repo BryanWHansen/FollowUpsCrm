@@ -57,7 +57,11 @@ const InteractionFormModal = ({
     mode: "onBlur",
     reValidateMode: "onChange",
     defaultValues: {
-      interactionDate: new Date().toISOString().split("T")[0],
+      interactionDate: new Date(
+        new Date().getTime() - new Date().getTimezoneOffset() * 60000,
+      )
+        .toISOString()
+        .split("T")[0],
     },
   });
 
@@ -68,7 +72,11 @@ const InteractionFormModal = ({
       fetchInteraction();
     } else if (open && !isEditMode) {
       reset({
-        interactionDate: new Date().toISOString().split("T")[0],
+        interactionDate: new Date(
+          new Date().getTime() - new Date().getTimezoneOffset() * 60000,
+        )
+          .toISOString()
+          .split("T")[0],
         interactionType: "",
         notes: "",
       });

@@ -180,10 +180,96 @@ async function processUserDigest(user) {
   }
 }
 
+/**
+ * Get pending follow-ups for a specific user for today
+ * @param {number} userId - User ID
+ * @returns {Promise<Array>} - Array of follow-up objects
+ */
+async function getUserFollowupsForToday(userId) {
+  const query = `
+    SELECT 
+      f.followupId,
+      c.firstName || ' ' || c.lastName as customerName,
+      c.phoneNumber as customerPhone,
+      f.messageBody,
+      f.messageSubject,
+      f.scheduledDate
+    FROM followups f
+    INNER JOIN customers c ON f.customerId = c.customerId
+    WHERE f.userId = $1
+      AND f.scheduledDate = CURRENT_DATE
+      AND f.status = 'pending'
+    ORDER BY c.lastName, c.firstName
+  `;
+
+  try {
+    const result = await pool.query(query, [userId]);
+    return result.rows;
+  } catch (error) {
+    console.error("Error querying user follow-ups for today:", error);
+    throw error;
+  }
+}
+
+/**
+ * Manually send digest for a specific user
+ * @param {number} userId - User ID
+ * @param {string} userEmail - User email
+ * @param {string} userFirstName - User first name
+ * @returns {Promise<Object>} - Result object with success status and message
+ */
+async function sendManualDigest(userId, userEmail, userFirstName) {
+  try {
+    // Get pending follow-ups for today
+    const followups = await getUserFollowupsForToday(userId);
+
+    if (followups.length === 0) {
+      return {
+        success: false,
+        message: "No pending follow-ups scheduled for today",
+        followupCount: 0,
+      };
+    }
+
+    // Send email
+    const name = userFirstName || "there";
+    await sendDailyDigest(userEmail, name, followups);
+
+    // Update follow-up statuses to 'sent'
+    await updateFollowupsToSent(followups);
+
+    // Record success
+    await recordDigestSent(userId, followups.length, "sent");
+
+    console.log(
+      `✅ Manual digest sent to ${userEmail} with ${followups.length} follow-ups`,
+    );
+
+    return {
+      success: true,
+      message: `Digest sent successfully with ${followups.length} follow-up${followups.length !== 1 ? "s" : ""}`,
+      followupCount: followups.length,
+    };
+  } catch (error) {
+    console.error(
+      `❌ Failed to send manual digest to ${userEmail}:`,
+      error.message,
+    );
+
+    // Record failure
+    const followups = await getUserFollowupsForToday(userId);
+    await recordDigestSent(userId, followups.length, "failed", error.message);
+
+    throw error;
+  }
+}
+
 module.exports = {
   getUsersWithFollowups,
   wasDigestSentToday,
   recordDigestSent,
   updateFollowupsToSent,
   processUserDigest,
+  getUserFollowupsForToday,
+  sendManualDigest,
 };
