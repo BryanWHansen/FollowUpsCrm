@@ -7,14 +7,25 @@ const {
 
 /**
  * Get all customers for the authenticated user
+ * Supports optional ?status=lead or ?status=customer query parameter
  */
 const getAllCustomers = async (req, res) => {
   try {
     const userId = req.user.userId;
-    const result = await pool.query(
-      "SELECT * FROM customers WHERE userId = $1 ORDER BY customerid",
-      [userId],
-    );
+    const { status } = req.query;
+
+    let query = "SELECT * FROM customers WHERE userId = $1";
+    const params = [userId];
+
+    // Add status filter if provided
+    if (status && ["lead", "customer"].includes(status)) {
+      query += " AND customerStatus = $2";
+      params.push(status);
+    }
+
+    query += " ORDER BY customerid";
+
+    const result = await pool.query(query, params);
     const customers = result.rows.map(mapToCustomer);
     res.json(customers);
   } catch (err) {
@@ -73,6 +84,7 @@ const createCustomer = async (req, res) => {
       address,
       email,
       notes,
+      customerStatus,
     } = customer;
 
     // Ensure birthday is in YYYY-MM-DD format (no timezone conversion)
@@ -82,8 +94,8 @@ const createCustomer = async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO customers (userId, firstName, lastName, preferredName, birthday, phoneNumber, address, email, notes) 
-       VALUES ($1, $2, $3, $4, $5::date, $6, $7, $8, $9) 
+      `INSERT INTO customers (userId, firstName, lastName, preferredName, birthday, phoneNumber, address, email, notes, customerStatus) 
+       VALUES ($1, $2, $3, $4, $5::date, $6, $7, $8, $9, $10) 
        RETURNING *`,
       [
         userId,
@@ -95,6 +107,7 @@ const createCustomer = async (req, res) => {
         address || null,
         email || null,
         notes || null,
+        customerStatus || "lead",
       ],
     );
 
@@ -177,6 +190,7 @@ const updateCustomer = async (req, res) => {
       address,
       email,
       notes,
+      customerStatus,
     } = customer;
 
     // Ensure birthday is in YYYY-MM-DD format (no timezone conversion)
@@ -188,8 +202,8 @@ const updateCustomer = async (req, res) => {
     const result = await client.query(
       `UPDATE customers 
        SET firstName = $1, lastName = $2, preferredName = $3, birthday = $4::date, 
-           phoneNumber = $5, address = $6, email = $7, notes = $8, updatedAt = CURRENT_TIMESTAMP
-       WHERE customerId = $9 AND userId = $10
+           phoneNumber = $5, address = $6, email = $7, notes = $8, customerStatus = $9, updatedAt = CURRENT_TIMESTAMP
+       WHERE customerId = $10 AND userId = $11
        RETURNING *`,
       [
         firstName,
@@ -200,6 +214,7 @@ const updateCustomer = async (req, res) => {
         address || null,
         email || null,
         notes || null,
+        customerStatus || "lead",
         id,
         userId,
       ],

@@ -16,47 +16,105 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  TextField,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormControlLabel,
+  Checkbox,
+  Paper,
 } from "@mui/material";
 import ArrowForwardIosSharpIcon from "@mui/icons-material/ArrowForwardIosSharp";
 import EmailIcon from "@mui/icons-material/Email";
+import ClearIcon from "@mui/icons-material/Clear";
 import { Link } from "react-router-dom";
 import { followupAPI } from "../../api/endpoints";
 import {
   formatInteractionType,
   getInteractionTypeColor,
 } from "../../utils/interactionTypes";
+import SendOverdueFollowupsModal from "../../components/modals/SendOverdueFollowupsModal";
+import SendTodayFollowupsModal from "../../components/modals/SendTodayFollowupsModal";
 
 const FollowUpsList = () => {
   const [searchParams] = useSearchParams();
   const [followups, setFollowups] = useState([]);
+  const [filteredFollowups, setFilteredFollowups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expanded, setExpanded] = useState(false);
   const [sendingDigest, setSendingDigest] = useState(false);
+  const [sendingOverdue, setSendingOverdue] = useState(false);
+  const [sendingToday, setSendingToday] = useState(false);
+  const [overdueModalOpen, setOverdueModalOpen] = useState(false);
+  const [todayModalOpen, setTodayModalOpen] = useState(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
     severity: "success",
   });
 
+  // Filter states
+  const getDefaultDateFrom = () => {
+    const date = new Date();
+    date.setDate(date.getDate() - 7);
+    return date.toISOString().split("T")[0];
+  };
+
+  const getDefaultDateTo = () => {
+    const date = new Date();
+    date.setDate(date.getDate() + 7);
+    return date.toISOString().split("T")[0];
+  };
+
+  const [interactionTypeFilter, setInteractionTypeFilter] = useState("");
+  const [showOverdueOnly, setShowOverdueOnly] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState(getDefaultDateFrom());
+  const [dateTo, setDateTo] = useState(getDefaultDateTo());
+
   const selectedDate = searchParams.get("date");
+  const overdueParam = searchParams.get("overdue");
 
   useEffect(() => {
     fetchFollowups();
+  }, []);
+
+  useEffect(() => {
+    applyFilters();
+  }, [
+    followups,
+    interactionTypeFilter,
+    showOverdueOnly,
+    customerSearch,
+    dateFrom,
+    dateTo,
+  ]);
+
+  // Update filters when selectedDate from URL changes
+  useEffect(() => {
+    if (selectedDate) {
+      setDateFrom(selectedDate);
+      setDateTo(selectedDate);
+    }
   }, [selectedDate]);
+
+  // Update filters when overdue parameter from URL changes
+  useEffect(() => {
+    if (overdueParam === "true") {
+      setShowOverdueOnly(true);
+      setExpanded(true); // Optionally expand filters to show the setting
+    }
+  }, [overdueParam]);
 
   const fetchFollowups = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const params = {};
-      if (selectedDate) {
-        params.scheduledDateFrom = selectedDate;
-        params.scheduledDateTo = selectedDate;
-      }
-
-      const response = await followupAPI.getAll(params);
+      // Fetch all followups without date filtering
+      const response = await followupAPI.getAll({});
       setFollowups(response.data);
     } catch (err) {
       console.error("Error fetching follow-ups:", err);
@@ -64,6 +122,61 @@ const FollowUpsList = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const applyFilters = () => {
+    let filtered = [...followups];
+
+    // Filter by date range
+    if (dateFrom) {
+      filtered = filtered.filter((f) => {
+        // Extract just the date part to avoid timezone issues
+        const schedDateStr = f.scheduledDate.split("T")[0];
+        return schedDateStr >= dateFrom;
+      });
+    }
+
+    if (dateTo) {
+      filtered = filtered.filter((f) => {
+        // Extract just the date part to avoid timezone issues
+        const schedDateStr = f.scheduledDate.split("T")[0];
+        return schedDateStr <= dateTo;
+      });
+    }
+
+    // Filter by interaction type
+    if (interactionTypeFilter) {
+      filtered = filtered.filter(
+        (f) => f.interactionType === interactionTypeFilter,
+      );
+    }
+
+    // Filter by overdue (only pending follow-ups scheduled before today)
+    if (showOverdueOnly) {
+      filtered = filtered.filter(
+        (f) => isOverdue(f.scheduledDate) && f.status === "pending",
+      );
+    }
+
+    // Filter by customer search
+    if (customerSearch.trim()) {
+      const searchLower = customerSearch.toLowerCase().trim();
+      filtered = filtered.filter((f) => {
+        const fullName =
+          `${f.customerFirstName} ${f.customerLastName}`.toLowerCase();
+        return fullName.includes(searchLower);
+      });
+    }
+
+    setFilteredFollowups(filtered);
+  };
+
+  const clearFilters = () => {
+    setInteractionTypeFilter("");
+    setShowOverdueOnly(false);
+    setCustomerSearch("");
+    setDateFrom("");
+    setDateTo("");
   };
 
   const formatDate = (dateString) => {
@@ -143,6 +256,60 @@ const FollowUpsList = () => {
     }
   };
 
+  const handleSendOverdue = async () => {
+    try {
+      setSendingOverdue(true);
+      const response = await followupAPI.sendOverdue();
+      setSnackbar({
+        open: true,
+        message: response.data.message,
+        severity: "success",
+      });
+      // Refresh the list to show updated statuses
+      fetchFollowups();
+      return { success: true };
+    } catch (err) {
+      console.error("Error sending overdue follow-ups:", err);
+      const errorMessage =
+        err.response?.data?.message || "Failed to send overdue follow-ups";
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: err.response?.status === 404 ? "info" : "error",
+      });
+      return { success: false, error: errorMessage };
+    } finally {
+      setSendingOverdue(false);
+    }
+  };
+
+  const handleSendToday = async () => {
+    try {
+      setSendingToday(true);
+      const response = await followupAPI.sendToday();
+      setSnackbar({
+        open: true,
+        message: response.data.message,
+        severity: "success",
+      });
+      // Refresh the list to show updated statuses
+      fetchFollowups();
+      return { success: true };
+    } catch (err) {
+      console.error("Error sending today's follow-ups:", err);
+      const errorMessage =
+        err.response?.data?.message || "Failed to send today's follow-ups";
+      setSnackbar({
+        open: true,
+        message: errorMessage,
+        severity: err.response?.status === 404 ? "info" : "error",
+      });
+      return { success: false, error: errorMessage };
+    } finally {
+      setSendingToday(false);
+    }
+  };
+
   const handleCloseSnackbar = () => {
     setSnackbar({ ...snackbar, open: false });
   };
@@ -177,21 +344,38 @@ const FollowUpsList = () => {
           mb: 2,
         }}
       >
-        <Typography variant="h4">
-          Follow-Ups
-          {selectedDate && ` - ${formatDateLong(selectedDate)}`}
-        </Typography>
-        {isTodaySelected() && (
+        <Typography variant="h4">Follow-Ups</Typography>
+        <Box sx={{ display: "flex", gap: 2 }}>
           <Button
-            variant="contained"
+            variant="outlined"
+            color="warning"
+            startIcon={<EmailIcon />}
+            onClick={() => setOverdueModalOpen(true)}
+            disabled={sendingOverdue}
+          >
+            {sendingOverdue ? "Sending..." : "Send Overdue"}
+          </Button>
+          <Button
+            variant="outlined"
             color="primary"
             startIcon={<EmailIcon />}
-            onClick={handleSendDigest}
-            disabled={sendingDigest}
+            onClick={() => setTodayModalOpen(true)}
+            disabled={sendingToday}
           >
-            {sendingDigest ? "Sending..." : "Send Digest Now"}
+            {sendingToday ? "Sending..." : "Send Today"}
           </Button>
-        )}
+          {isTodaySelected() && (
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<EmailIcon />}
+              onClick={handleSendDigest}
+              disabled={sendingDigest}
+            >
+              {sendingDigest ? "Sending..." : "Send Digest Now"}
+            </Button>
+          )}
+        </Box>
       </Box>
 
       {error && (
@@ -200,11 +384,100 @@ const FollowUpsList = () => {
         </Alert>
       )}
 
+      {/* Filters Section */}
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Typography variant="h6" gutterBottom>
+          Filters
+        </Typography>
+        <Grid container spacing={2} alignItems="center">
+          {/* Date Range Filters */}
+          <Grid item xs={12} sm={6} md={2}>
+            <TextField
+              label="From Date"
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              fullWidth
+              size="small"
+              InputLabelProps={{ shrink: true }}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={2}>
+            <TextField
+              label="To Date"
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              fullWidth
+              size="small"
+              InputLabelProps={{ shrink: true }}
+            />
+          </Grid>
+
+          {/* Interaction Type Filter */}
+          <Grid item xs={12} sm={6} md={2}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Interaction Type</InputLabel>
+              <Select
+                value={interactionTypeFilter}
+                label="Interaction Type"
+                onChange={(e) => setInteractionTypeFilter(e.target.value)}
+              >
+                <MenuItem value="">All Types</MenuItem>
+                <MenuItem value="purchase">Purchase</MenuItem>
+                <MenuItem value="interest">Interest</MenuItem>
+                <MenuItem value="test_drive">Test Drive</MenuItem>
+                <MenuItem value="general_inquiry">General Inquiry</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+
+          {/* Customer Search */}
+          <Grid item xs={12} sm={6} md={3}>
+            <TextField
+              label="Search Customer"
+              placeholder="Enter customer name"
+              value={customerSearch}
+              onChange={(e) => setCustomerSearch(e.target.value)}
+              fullWidth
+              size="small"
+            />
+          </Grid>
+
+          {/* Show Overdue Only */}
+          <Grid item xs={12} sm={6} md={2}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={showOverdueOnly}
+                  onChange={(e) => setShowOverdueOnly(e.target.checked)}
+                />
+              }
+              label="Overdue Only"
+            />
+          </Grid>
+        </Grid>
+
+        {/* Clear Filters Button */}
+        <Box sx={{ mt: 2 }}>
+          <Button
+            variant="outlined"
+            color="secondary"
+            startIcon={<ClearIcon />}
+            onClick={clearFilters}
+          >
+            Clear Filters
+          </Button>
+        </Box>
+      </Paper>
+
       <Card>
         <CardContent>
-          {followups.length === 0 ? (
+          {filteredFollowups.length === 0 ? (
             <Typography color="text.secondary" sx={{ py: 2 }}>
-              No follow-ups scheduled{selectedDate ? " for this date" : ""}.
+              {followups.length === 0
+                ? "No follow-ups found."
+                : "No follow-ups match the current filters."}
             </Typography>
           ) : (
             <Box>
@@ -214,7 +487,7 @@ const FollowUpsList = () => {
                   display: "grid",
                   gridTemplateColumns: {
                     xs: "1fr",
-                    sm: "2fr 3fr 2fr 2fr 3fr",
+                    sm: "2fr 3fr 2fr 2fr",
                   },
                   gap: 2,
                   p: 2,
@@ -236,12 +509,9 @@ const FollowUpsList = () => {
                 <Typography variant="body2" fontWeight="bold">
                   Status
                 </Typography>
-                <Typography variant="body2" fontWeight="bold">
-                  Vehicle
-                </Typography>
               </Box>
 
-              {followups.map((followup) => (
+              {filteredFollowups.map((followup) => (
                 <Accordion
                   key={followup.followupId}
                   expanded={expanded === `followup-${followup.followupId}`}
@@ -262,7 +532,8 @@ const FollowUpsList = () => {
                     },
                     backgroundColor: isToday(followup.scheduledDate)
                       ? "warning.lighter"
-                      : isOverdue(followup.scheduledDate)
+                      : isOverdue(followup.scheduledDate) &&
+                          followup.status === "pending"
                         ? "error.lighter"
                         : "inherit",
                   }}
@@ -296,7 +567,8 @@ const FollowUpsList = () => {
                             isToday(followup.scheduledDate) ? "bold" : "medium"
                           }
                           color={
-                            isOverdue(followup.scheduledDate)
+                            isOverdue(followup.scheduledDate) &&
+                            followup.status === "pending"
                               ? "error"
                               : "inherit"
                           }
@@ -340,18 +612,6 @@ const FollowUpsList = () => {
                           }
                           size="small"
                         />
-                      </Grid>
-                      <Grid item xs={12} sm={3}>
-                        {followup.vehicleMake && followup.vehicleModel ? (
-                          <Typography variant="body2" noWrap>
-                            {followup.vehicleYear} {followup.vehicleMake}{" "}
-                            {followup.vehicleModel}
-                          </Typography>
-                        ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            N/A
-                          </Typography>
-                        )}
                       </Grid>
                     </Grid>
                   </AccordionSummary>
@@ -401,6 +661,13 @@ const FollowUpsList = () => {
               ))}
             </Box>
           )}
+          {/* Results Count */}
+          <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: "divider" }}>
+            <Typography variant="body2" color="text.secondary">
+              Showing {filteredFollowups.length} of {followups.length}{" "}
+              follow-ups
+            </Typography>
+          </Box>
         </CardContent>
       </Card>
 
@@ -418,6 +685,18 @@ const FollowUpsList = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      <SendOverdueFollowupsModal
+        open={overdueModalOpen}
+        onClose={() => setOverdueModalOpen(false)}
+        onConfirm={handleSendOverdue}
+      />
+
+      <SendTodayFollowupsModal
+        open={todayModalOpen}
+        onClose={() => setTodayModalOpen(false)}
+        onConfirm={handleSendToday}
+      />
     </Box>
   );
 };

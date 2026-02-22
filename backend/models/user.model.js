@@ -13,6 +13,7 @@ const mapToUser = (row) => {
     lastName: row.lastname,
     createdAt: row.createdat,
     lastLogin: row.lastlogin,
+    emailVerified: row.email_verified || false,
   };
 };
 

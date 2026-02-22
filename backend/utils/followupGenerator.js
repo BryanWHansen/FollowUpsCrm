@@ -118,7 +118,11 @@ const generateFollowupsForVehicle = async (client, params) => {
  * @param {number} userId - User ID
  * @returns {Promise<Array>} Array of regenerated follow-ups
  */
-const regenerateFollowupsForInteraction = async (client, interactionId, userId) => {
+const regenerateFollowupsForInteraction = async (
+  client,
+  interactionId,
+  userId,
+) => {
   console.log(`Regenerating follow-ups for interaction ${interactionId}`);
 
   // Get interaction details
@@ -127,7 +131,7 @@ const regenerateFollowupsForInteraction = async (client, interactionId, userId) 
      FROM interactions i
      JOIN customers c ON i.customerId = c.customerId
      WHERE i.interactionId = $1 AND i.userId = $2`,
-    [interactionId, userId]
+    [interactionId, userId],
   );
 
   if (interactionResult.rows.length === 0) {
@@ -142,10 +146,12 @@ const regenerateFollowupsForInteraction = async (client, interactionId, userId) 
     `DELETE FROM followups 
      WHERE interactionId = $1 AND userId = $2 AND status IN ('pending', 'sent')
      RETURNING followupId`,
-    [interactionId, userId]
+    [interactionId, userId],
   );
 
-  console.log(`Deleted ${deleteResult.rowCount} pending/sent follow-ups for interaction ${interactionId}`);
+  console.log(
+    `Deleted ${deleteResult.rowCount} pending/sent follow-ups for interaction ${interactionId}`,
+  );
 
   // Get vehicle info if it exists (check both purchased vehicles and interest vehicles)
   const vehicleResult = await client.query(
@@ -155,7 +161,7 @@ const regenerateFollowupsForInteraction = async (client, interactionId, userId) 
      SELECT make, model, year FROM customerinterestvehicles 
      WHERE interactionId = $1
      LIMIT 1`,
-    [interactionId]
+    [interactionId],
   );
 
   const vehicle = vehicleResult.rows[0] || {};
@@ -167,12 +173,14 @@ const regenerateFollowupsForInteraction = async (client, interactionId, userId) 
     interactionId,
     interactionType: interaction.interactiontype,
     interactionDate: interaction.interactiondate,
-    vehicleMake: vehicle.make || '',
-    vehicleModel: vehicle.model || '',
-    vehicleYear: vehicle.year || '',
+    vehicleMake: vehicle.make || "",
+    vehicleModel: vehicle.model || "",
+    vehicleYear: vehicle.year || "",
   });
 
-  console.log(`Regenerated ${newFollowups.length} follow-ups for interaction ${interactionId}`);
+  console.log(
+    `Regenerated ${newFollowups.length} follow-ups for interaction ${interactionId}`,
+  );
   return newFollowups;
 };
 
@@ -190,7 +198,7 @@ const regenerateFollowupsForCustomer = async (client, customerId, userId) => {
   const interactionsResult = await client.query(
     `SELECT interactionId FROM interactions 
      WHERE customerId = $1 AND userId = $2`,
-    [customerId, userId]
+    [customerId, userId],
   );
 
   let count = 0;
@@ -199,12 +207,145 @@ const regenerateFollowupsForCustomer = async (client, customerId, userId) => {
     count++;
   }
 
-  console.log(`Regenerated follow-ups for ${count} interactions for customer ${customerId}`);
+  console.log(
+    `Regenerated follow-ups for ${count} interactions for customer ${customerId}`,
+  );
   return count;
+};
+
+/**
+ * Generate follow-ups for existing interactions when a new template is created
+ * Only creates follow-ups if the scheduled date would be today or in the future
+ * @param {Object} client - Database client (for transaction)
+ * @param {Object} template - The newly created template
+ * @param {number} userId - User ID
+ * @returns {Promise<Array>} Array of generated follow-ups
+ */
+const generateFollowupsForNewTemplate = async (client, template, userId) => {
+  console.log(
+    `Generating follow-ups for new template ${template.templateId} (${template.interactionType})`,
+  );
+
+  const generatedFollowups = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Get all interactions of this type for the user
+  const interactionsResult = await client.query(
+    `SELECT i.interactionId, i.customerId, i.interactionType, i.interactionDate
+     FROM interactions i
+     WHERE i.userId = $1 AND i.interactionType = $2
+     ORDER BY i.interactionDate`,
+    [userId, template.interactionType],
+  );
+
+  console.log(
+    `Found ${interactionsResult.rows.length} interactions of type ${template.interactionType}`,
+  );
+
+  for (const interaction of interactionsResult.rows) {
+    // Calculate what the scheduled date would be
+    const interactionDate = new Date(interaction.interactiondate);
+    const scheduledDate = new Date(interactionDate);
+    scheduledDate.setDate(scheduledDate.getDate() + template.daysAfter);
+    scheduledDate.setHours(0, 0, 0, 0);
+
+    // Only create follow-up if scheduled date is today or in the future
+    if (scheduledDate < today) {
+      console.log(
+        `Skipping interaction ${interaction.interactionid} - scheduled date ${scheduledDate.toISOString()} is in the past`,
+      );
+      continue;
+    }
+
+    // Check if a follow-up already exists for this interaction and template
+    const existingResult = await client.query(
+      `SELECT followupId FROM followups 
+       WHERE interactionId = $1 AND templateId = $2`,
+      [interaction.interactionid, template.templateId],
+    );
+
+    if (existingResult.rows.length > 0) {
+      console.log(
+        `Follow-up already exists for interaction ${interaction.interactionid} and template ${template.templateId}`,
+      );
+      continue;
+    }
+
+    // Get vehicle info if it exists
+    const vehicleResult = await client.query(
+      `SELECT make, model, year FROM purchasedvehicles 
+       WHERE interactionId = $1
+       UNION ALL
+       SELECT make, model, year FROM customerinterestvehicles 
+       WHERE interactionId = $1
+       LIMIT 1`,
+      [interaction.interactionid],
+    );
+
+    const vehicle = vehicleResult.rows[0] || {};
+
+    // Get customer data for template rendering
+    const customerResult = await client.query(
+      `SELECT u.firstname as userfirst, u.lastname as userlast, 
+              c.firstName, c.lastName, c.preferredName
+       FROM customers c
+       INNER JOIN users u ON u.userid = c.userid
+       WHERE c.customerId = $1`,
+      [interaction.customerid],
+    );
+
+    const customerData = customerResult.rows[0] || {};
+    const templateData = {
+      userFirstName: customerData.userfirst,
+      userLastName: customerData.userlast,
+      customerFirstName: customerData.firstname,
+      customerLastName: customerData.lastname,
+      customerPreferredName: customerData.preferredname,
+      vehicleMake: vehicle.make || "",
+      vehicleModel: vehicle.model || "",
+      vehicleYear: vehicle.year ? String(vehicle.year) : "",
+      interactionDate: interaction.interactiondate,
+      daysElapsed: "",
+    };
+
+    // Render template
+    const renderedSubject = template.messageSubject
+      ? renderTemplate(template.messageSubject, templateData)
+      : null;
+    const renderedBody = renderTemplate(template.messageBody, templateData);
+
+    // Insert follow-up
+    const followupResult = await client.query(
+      `INSERT INTO followups (userId, customerId, interactionId, templateId, scheduledDate, status, messageSubject, messageBody)
+       VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7)
+       RETURNING *`,
+      [
+        userId,
+        interaction.customerid,
+        interaction.interactionid,
+        template.templateId,
+        scheduledDate,
+        renderedSubject,
+        renderedBody,
+      ],
+    );
+
+    generatedFollowups.push(mapToFollowUp(followupResult.rows[0]));
+    console.log(
+      `Created follow-up for interaction ${interaction.interactionid}, scheduled for ${scheduledDate.toISOString()}`,
+    );
+  }
+
+  console.log(
+    `Generated ${generatedFollowups.length} follow-ups for new template ${template.templateId}`,
+  );
+  return generatedFollowups;
 };
 
 module.exports = {
   generateFollowupsForVehicle,
   regenerateFollowupsForInteraction,
   regenerateFollowupsForCustomer,
+  generateFollowupsForNewTemplate,
 };

@@ -2,7 +2,10 @@
 const express = require("express");
 const router = express.Router();
 const followupController = require("../controllers/followup.controller");
-const { authenticateToken } = require("../middleware/auth.middleware");
+const {
+  authenticateToken,
+  requireEmailVerification,
+} = require("../middleware/auth.middleware");
 
 // All follow-up routes require authentication
 router.use(authenticateToken);
@@ -20,14 +23,26 @@ router.get("/templates/variables", followupController.getTemplateVariablesList);
 // GET /api/followups/templates/:id - Get template by id
 router.get("/templates/:id", followupController.getTemplateById);
 
-// POST /api/followups/templates - Create a new template
-router.post("/templates", followupController.createTemplate);
+// POST /api/followups/templates - Create a new template (requires email verification)
+router.post(
+  "/templates",
+  requireEmailVerification,
+  followupController.createTemplate,
+);
 
-// PUT /api/followups/templates/:id - Update a template
-router.put("/templates/:id", followupController.updateTemplate);
+// PUT /api/followups/templates/:id - Update a template (requires email verification)
+router.put(
+  "/templates/:id",
+  requireEmailVerification,
+  followupController.updateTemplate,
+);
 
-// DELETE /api/followups/templates/:id - Delete a template
-router.delete("/templates/:id", followupController.deleteTemplate);
+// DELETE /api/followups/templates/:id - Delete a template (requires email verification)
+router.delete(
+  "/templates/:id",
+  requireEmailVerification,
+  followupController.deleteTemplate,
+);
 
 // ============================================
 // FOLLOW-UP ROUTES
@@ -36,8 +51,26 @@ router.delete("/templates/:id", followupController.deleteTemplate);
 // GET /api/followups/upcoming - Get upcoming follow-ups (next N days)
 router.get("/upcoming", followupController.getUpcomingFollowUps);
 
-// POST /api/followups/send-digest - Manually send digest for today's pending follow-ups
-router.post("/send-digest", followupController.sendDigestNow);
+// POST /api/followups/send-digest - Manually send digest for today's pending follow-ups (requires email verification)
+router.post(
+  "/send-digest",
+  requireEmailVerification,
+  followupController.sendDigestNow,
+);
+
+// POST /api/followups/send-overdue - Manually send overdue follow-ups from the past week (requires email verification)
+router.post(
+  "/send-overdue",
+  requireEmailVerification,
+  followupController.sendOverdueFollowupsNow,
+);
+
+// POST /api/followups/send-today - Manually send today's pending follow-ups (requires email verification)
+router.post(
+  "/send-today",
+  requireEmailVerification,
+  followupController.sendTodayFollowupsNow,
+);
 
 // GET /api/followups - Get all follow-ups
 router.get("/", followupController.getAllFollowUps);
@@ -45,16 +78,32 @@ router.get("/", followupController.getAllFollowUps);
 // GET /api/followups/:id - Get follow-up by id
 router.get("/:id", followupController.getFollowUpById);
 
-// PUT /api/followups/:id/complete - Mark follow-up as completed
-router.put("/:id/complete", followupController.completeFollowUp);
+// PUT /api/followups/:id/complete - Mark follow-up as completed (requires email verification)
+router.put(
+  "/:id/complete",
+  requireEmailVerification,
+  followupController.completeFollowUp,
+);
 
-// PUT /api/followups/:id/dismiss - Dismiss a follow-up
-router.put("/:id/dismiss", followupController.dismissFollowUp);
+// PUT /api/followups/:id/dismiss - Dismiss a follow-up (requires email verification)
+router.put(
+  "/:id/dismiss",
+  requireEmailVerification,
+  followupController.dismissFollowUp,
+);
 
-// PUT /api/followups/:id/snooze - Snooze a follow-up
-router.put("/:id/snooze", followupController.snoozeFollowUp);
+// PUT /api/followups/:id/snooze - Snooze a follow-up (requires email verification)
+router.put(
+  "/:id/snooze",
+  requireEmailVerification,
+  followupController.snoozeFollowUp,
+);
 
-// DELETE /api/followups/:id - Delete a follow-up
-router.delete("/:id", followupController.deleteFollowUp);
+// DELETE /api/followups/:id - Delete a follow-up (requires email verification)
+router.delete(
+  "/:id",
+  requireEmailVerification,
+  followupController.deleteFollowUp,
+);
 
 module.exports = router;

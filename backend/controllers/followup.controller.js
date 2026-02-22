@@ -10,7 +10,14 @@ const {
   validateFollowUpUpdate,
   renderTemplate,
 } = require("../models/followup.model");
-const { sendManualDigest } = require("../services/digestService");
+const {
+  sendManualDigest,
+  sendOverdueFollowups,
+  sendTodayFollowups,
+} = require("../services/digestService");
+const {
+  generateFollowupsForNewTemplate,
+} = require("../utils/followupGenerator");
 
 // ============================================
 // TEMPLATE CONTROLLERS
@@ -78,6 +85,7 @@ const getTemplateById = async (req, res) => {
  * Create a new template
  */
 const createTemplate = async (req, res) => {
+  const client = await pool.connect();
   try {
     const userId = req.user.userId;
     const template = req.body.template || req.body;
@@ -96,7 +104,9 @@ const createTemplate = async (req, res) => {
       isActive,
     } = template;
 
-    const result = await pool.query(
+    await client.query("BEGIN");
+
+    const result = await client.query(
       `
       INSERT INTO followuptemplates (userId, templateName, interactionType, daysAfter, messageSubject, messageBody, isActive)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -114,10 +124,32 @@ const createTemplate = async (req, res) => {
     );
 
     const newTemplate = mapToTemplate(result.rows[0]);
-    res.status(201).json(newTemplate);
+
+    // Generate follow-ups for existing interactions if template is active
+    let generatedFollowups = [];
+    if (newTemplate.isActive) {
+      generatedFollowups = await generateFollowupsForNewTemplate(
+        client,
+        newTemplate,
+        userId,
+      );
+      console.log(
+        `Created template generated ${generatedFollowups.length} follow-ups for existing interactions`,
+      );
+    }
+
+    await client.query("COMMIT");
+
+    res.status(201).json({
+      template: newTemplate,
+      generatedFollowups: generatedFollowups.length,
+    });
   } catch (err) {
+    await client.query("ROLLBACK");
     console.error(err.message);
     res.status(500).json({ error: "Server error" });
+  } finally {
+    client.release();
   }
 };
 
@@ -655,6 +687,84 @@ const sendDigestNow = async (req, res) => {
   }
 };
 
+/**
+ * Manually send overdue follow-ups from the past week
+ */
+const sendOverdueFollowupsNow = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const userEmail = req.user.email;
+
+    // Fetch user's firstName from database
+    const userResult = await pool.query(
+      "SELECT firstName FROM users WHERE userId = $1",
+      [userId],
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const userFirstName = userResult.rows[0].firstname;
+
+    const result = await sendOverdueFollowups(userId, userEmail, userFirstName);
+
+    if (result.success) {
+      res.json({
+        message: result.message,
+        followupCount: result.followupCount,
+      });
+    } else {
+      res.status(404).json({
+        message: result.message,
+        followupCount: result.followupCount,
+      });
+    }
+  } catch (err) {
+    console.error("Error sending overdue follow-ups:", err.message);
+    res.status(500).json({ error: "Failed to send overdue follow-ups" });
+  }
+};
+
+/**
+ * Manually send today's follow-ups
+ */
+const sendTodayFollowupsNow = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const userEmail = req.user.email;
+
+    // Fetch user's firstName from database
+    const userResult = await pool.query(
+      "SELECT firstName FROM users WHERE userId = $1",
+      [userId],
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const userFirstName = userResult.rows[0].firstname;
+
+    const result = await sendTodayFollowups(userId, userEmail, userFirstName);
+
+    if (result.success) {
+      res.json({
+        message: result.message,
+        followupCount: result.followupCount,
+      });
+    } else {
+      res.status(404).json({
+        message: result.message,
+        followupCount: result.followupCount,
+      });
+    }
+  } catch (err) {
+    console.error("Error sending today's follow-ups:", err.message);
+    res.status(500).json({ error: "Failed to send today's follow-ups" });
+  }
+};
+
 module.exports = {
   // Template controllers
   getAllTemplates,
@@ -672,4 +782,6 @@ module.exports = {
   snoozeFollowUp,
   deleteFollowUp,
   sendDigestNow,
+  sendOverdueFollowupsNow,
+  sendTodayFollowupsNow,
 };

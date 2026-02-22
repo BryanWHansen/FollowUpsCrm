@@ -5,6 +5,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 // Pages
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
+import VerifyEmail from "./pages/auth/VerifyEmail";
 import Dashboard from "./pages/Dashboard";
 import CustomersList from "./pages/customers/CustomersList";
 import CustomerDetail from "./pages/customers/CustomerDetail";
@@ -39,6 +40,8 @@ function App() {
           {/* Public routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          {/* Email verification - public route (can be accessed from email link without login) */}
+          <Route path="/verify-email" element={<VerifyEmail />} />
 
           {/* Protected routes */}
           <Route element={<PrivateRoute />}>

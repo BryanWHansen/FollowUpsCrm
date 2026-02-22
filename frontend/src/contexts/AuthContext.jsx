@@ -39,10 +39,16 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       const response = await authAPI.login({ email, password });
-      const { token, isFirstLogin, ...userData } = response.data;
+      const { token, isFirstLogin, emailVerified, ...userData } = response.data;
 
       localStorage.setItem("token", token);
-      setUser(userData);
+      setUser(response.data);
+
+      // Check if email is verified
+      if (!emailVerified) {
+        navigate("/verify-email");
+        return { success: true, requiresVerification: true };
+      }
 
       // Redirect to welcome screen for first-time users
       if (isFirstLogin) {
@@ -68,8 +74,8 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem("token", token);
       setUser(userInfo);
 
-      // Redirect to welcome screen for new users
-      navigate("/welcome");
+      // Always redirect to verify-email page after registration
+      navigate("/verify-email");
 
       return { success: true };
     } catch (error) {
@@ -91,8 +97,15 @@ export const AuthProvider = ({ children }) => {
 
   const updateUser = async (userData) => {
     try {
-      const response = await userPreferencesAPI.updateUser(userData);
-      setUser(response.data);
+      // If userData is provided, update with new data
+      if (userData) {
+        const response = await userPreferencesAPI.updateUser(userData);
+        setUser(response.data);
+      } else {
+        // Otherwise, just refresh user data from server
+        const response = await authAPI.getCurrentUser();
+        setUser(response.data);
+      }
       return { success: true };
     } catch (error) {
       return {

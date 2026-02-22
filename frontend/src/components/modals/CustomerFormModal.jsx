@@ -15,11 +15,22 @@ import {
   Stepper,
   Step,
   StepLabel,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  FormHelperText,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { customerAPI } from "../../api/endpoints";
 
-const CustomerFormModal = ({ open, onClose, customerId, onSuccess }) => {
+const CustomerFormModal = ({
+  open,
+  onClose,
+  customerId,
+  onSuccess,
+  defaultStatus = "lead",
+}) => {
   const isEditMode = Boolean(customerId);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -32,9 +43,13 @@ const CustomerFormModal = ({ open, onClose, customerId, onSuccess }) => {
     formState: { errors },
     reset,
     watch,
+    setValue,
   } = useForm({
     mode: "onBlur",
     reValidateMode: "onChange",
+    defaultValues: {
+      customerStatus: defaultStatus,
+    },
   });
 
   const watchedFields = watch();
@@ -43,7 +58,9 @@ const CustomerFormModal = ({ open, onClose, customerId, onSuccess }) => {
     if (open && isEditMode && customerId) {
       fetchCustomer();
     } else if (open && !isEditMode) {
-      reset({});
+      reset({
+        customerStatus: defaultStatus,
+      });
       setError("");
       setIsDirty(false);
     }
@@ -218,6 +235,29 @@ const CustomerFormModal = ({ open, onClose, customerId, onSuccess }) => {
                     error={!!errors.email}
                     helperText={errors.email?.message}
                   />
+                </Grid>
+
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth>
+                    <InputLabel id="customer-status-label">Status</InputLabel>
+                    <Select
+                      labelId="customer-status-label"
+                      label="Status"
+                      {...register("customerStatus", {
+                        required: "Status is required",
+                      })}
+                      defaultValue="lead"
+                      error={!!errors.customerStatus}
+                    >
+                      <MenuItem value="lead">Lead</MenuItem>
+                      <MenuItem value="customer">Customer</MenuItem>
+                    </Select>
+                    {errors.customerStatus && (
+                      <FormHelperText error>
+                        {errors.customerStatus?.message}
+                      </FormHelperText>
+                    )}
+                  </FormControl>
                 </Grid>
 
                 <Grid item xs={12} sm={6}>

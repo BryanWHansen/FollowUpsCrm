@@ -17,9 +17,10 @@ const mapToCustomer = (row) => {
     address: row.address,
     email: row.email,
     notes: row.notes,
+    customerStatus: row.customerstatus,
     lastContactDate: row.lastcontactdate,
     createdAt: row.createdat,
-    updatedAt: row.updatedat
+    updatedAt: row.updatedat,
   };
 };
 
@@ -30,30 +31,48 @@ const mapToCustomer = (row) => {
  */
 const validateCustomer = (customer) => {
   const errors = [];
-  
+
   if (!customer) {
-    return { isValid: false, errors: ['Customer object is required'] };
+    return { isValid: false, errors: ["Customer object is required"] };
   }
-  
-  console.log('Validating customer:', JSON.stringify(customer, null, 2));
-  console.log('firstName:', customer.firstName, 'Type:', typeof customer.firstName);
-  console.log('lastName:', customer.lastName, 'Type:', typeof customer.lastName);
-  
-  if (!customer.firstName || customer.firstName.trim() === '') {
-    errors.push('First name is required');
+
+  console.log("Validating customer:", JSON.stringify(customer, null, 2));
+  console.log(
+    "firstName:",
+    customer.firstName,
+    "Type:",
+    typeof customer.firstName,
+  );
+  console.log(
+    "lastName:",
+    customer.lastName,
+    "Type:",
+    typeof customer.lastName,
+  );
+
+  if (!customer.firstName || customer.firstName.trim() === "") {
+    errors.push("First name is required");
   }
-  
-  if (!customer.lastName || customer.lastName.trim() === '') {
-    errors.push('Last name is required');
+
+  if (!customer.lastName || customer.lastName.trim() === "") {
+    errors.push("Last name is required");
   }
-  
+
+  // Validate customerStatus if provided
+  if (
+    customer.customerStatus &&
+    !["lead", "customer"].includes(customer.customerStatus)
+  ) {
+    errors.push('Customer status must be either "lead" or "customer"');
+  }
+
   return {
     isValid: errors.length === 0,
-    errors
+    errors,
   };
 };
 
 module.exports = {
   mapToCustomer,
-  validateCustomer
+  validateCustomer,
 };

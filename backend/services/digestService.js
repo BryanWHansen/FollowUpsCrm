@@ -189,10 +189,10 @@ async function getUserFollowupsForToday(userId) {
   const query = `
     SELECT 
       f.followupId,
-      c.firstName || ' ' || c.lastName as customerName,
-      c.phoneNumber as customerPhone,
-      f.messageBody,
-      f.messageSubject,
+      c.firstName || ' ' || c.lastName as "customerName",
+      c.phoneNumber as "customerPhone",
+      f.messageBody as "messageBody",
+      f.messageSubject as "messageSubject",
       f.scheduledDate
     FROM followups f
     INNER JOIN customers c ON f.customerId = c.customerId
@@ -264,6 +264,144 @@ async function sendManualDigest(userId, userEmail, userFirstName) {
   }
 }
 
+/**
+ * Get overdue follow-ups for a specific user (past week)
+ * @param {number} userId - User ID
+ * @returns {Promise<Array>} - Array of follow-up objects
+ */
+async function getUserOverdueFollowups(userId) {
+  const query = `
+    SELECT 
+      f.followupId,
+      c.firstName || ' ' || c.lastName as "customerName",
+      c.phoneNumber as "customerPhone",
+      f.messageBody as "messageBody",
+      f.messageSubject as "messageSubject",
+      f.scheduledDate
+    FROM followups f
+    INNER JOIN customers c ON f.customerId = c.customerId
+    WHERE f.userId = $1
+      AND f.scheduledDate >= CURRENT_DATE - INTERVAL '7 days'
+      AND f.scheduledDate < CURRENT_DATE
+      AND f.status = 'pending'
+    ORDER BY f.scheduledDate DESC, c.lastName, c.firstName
+  `;
+
+  try {
+    const result = await pool.query(query, [userId]);
+    console.log(
+      "getUserOverdueFollowups result:",
+      JSON.stringify(result.rows, null, 2),
+    );
+    return result.rows;
+  } catch (error) {
+    console.error("Error querying user overdue follow-ups:", error);
+    throw error;
+  }
+}
+
+/**
+ * Manually send overdue follow-ups for a specific user
+ * @param {number} userId - User ID
+ * @param {string} userEmail - User email
+ * @param {string} userFirstName - User first name
+ * @returns {Promise<Object>} - Result object with success status and message
+ */
+async function sendOverdueFollowups(userId, userEmail, userFirstName) {
+  try {
+    // Get overdue follow-ups from the past week
+    const followups = await getUserOverdueFollowups(userId);
+
+    if (followups.length === 0) {
+      return {
+        success: false,
+        message: "No overdue follow-ups from the past week",
+        followupCount: 0,
+      };
+    }
+
+    console.log(
+      "About to send overdue followups:",
+      JSON.stringify(followups, null, 2),
+    );
+
+    // Send email
+    const name = userFirstName || "there";
+    await sendDailyDigest(userEmail, name, followups);
+
+    // Update follow-up statuses to 'sent'
+    await updateFollowupsToSent(followups);
+
+    console.log(
+      `✅ Overdue follow-ups sent to ${userEmail} with ${followups.length} follow-ups`,
+    );
+
+    return {
+      success: true,
+      message: `Successfully sent ${followups.length} overdue follow-up${followups.length !== 1 ? "s" : ""} from the past week`,
+      followupCount: followups.length,
+    };
+  } catch (error) {
+    console.error(
+      `❌ Failed to send overdue follow-ups to ${userEmail}:`,
+      error.message,
+    );
+
+    throw error;
+  }
+}
+
+/**
+ * Manually send today's follow-ups for a specific user
+ * @param {number} userId - User ID
+ * @param {string} userEmail - User email
+ * @param {string} userFirstName - User first name
+ * @returns {Promise<Object>} - Result object with success status and message
+ */
+async function sendTodayFollowups(userId, userEmail, userFirstName) {
+  try {
+    // Get pending follow-ups scheduled for today
+    const followups = await getUserFollowupsForToday(userId);
+
+    if (followups.length === 0) {
+      return {
+        success: false,
+        message: "No pending follow-ups scheduled for today",
+        followupCount: 0,
+      };
+    }
+
+    console.log(
+      "About to send today's followups:",
+      JSON.stringify(followups, null, 2),
+    );
+
+    // Send email
+    const name = userFirstName || "there";
+    await sendDailyDigest(userEmail, name, followups);
+
+    // Update follow-up statuses to 'sent'
+    await updateFollowupsToSent(followups);
+
+    console.log(
+      `✅ Today's follow-ups sent to ${userEmail} with ${followups.length} follow-ups`,
+    );
+
+    return {
+      success: true,
+      message: `Successfully sent ${followups.length} follow-up${followups.length !== 1 ? "s" : ""} scheduled for today`,
+      followupCount: followups.length,
+    };
+  } catch (error) {
+    console.error(
+      `❌ Failed to send today's follow-ups to ${userEmail}:`,
+      error.message,
+    );
+
+    throw error;
+  }
+}
+
 module.exports = {
   getUsersWithFollowups,
   wasDigestSentToday,
@@ -272,4 +410,7 @@ module.exports = {
   processUserDigest,
   getUserFollowupsForToday,
   sendManualDigest,
+  getUserOverdueFollowups,
+  sendOverdueFollowups,
+  sendTodayFollowups,
 };

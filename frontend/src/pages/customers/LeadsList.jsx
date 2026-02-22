@@ -21,8 +21,6 @@ import {
   DialogActions,
   TextField,
   InputAdornment,
-  Tabs,
-  Tab,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -37,10 +35,8 @@ import InteractionFormModal from "../../components/modals/InteractionFormModal";
 import VehicleFormModal from "../../components/modals/VehicleFormModal";
 import InterestVehicleFormModal from "../../components/modals/InterestVehicleFormModal";
 
-const CustomersList = () => {
+const LeadsList = () => {
   const [customers, setCustomers] = useState([]);
-  const [leads, setLeads] = useState([]);
-  const [currentTab, setCurrentTab] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -65,24 +61,15 @@ const CustomersList = () => {
   const fetchCustomers = async () => {
     try {
       setLoading(true);
-      const [customersRes, leadsRes] = await Promise.all([
-        customerAPI.getAll("customer"),
-        customerAPI.getAll("lead"),
-      ]);
-      setCustomers(customersRes.data);
-      setLeads(leadsRes.data);
+      const response = await customerAPI.getAll("lead");
+      setCustomers(response.data);
       setError("");
     } catch (err) {
-      setError("Failed to load customers and leads");
+      setError("Failed to load leads");
       console.error(err);
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleTabChange = (event, newValue) => {
-    setCurrentTab(newValue);
-    setSearchQuery(""); // Clear search when switching tabs
   };
 
   const formatCustomerName = (customer) => {
@@ -191,25 +178,15 @@ const CustomersList = () => {
       setDeleting(true);
       await customerAPI.delete(customerToDelete.customerId);
 
-      // Remove from appropriate list
-      if (currentTab === 0) {
-        setCustomers(
-          customers.filter((c) => c.customerId !== customerToDelete.customerId),
-        );
-      } else {
-        setLeads(
-          leads.filter((c) => c.customerId !== customerToDelete.customerId),
-        );
-      }
+      // Remove customer from list
+      setCustomers(
+        customers.filter((c) => c.customerId !== customerToDelete.customerId),
+      );
       setDeleteDialogOpen(false);
       setCustomerToDelete(null);
       setError("");
     } catch (err) {
-      setError(
-        currentTab === 0
-          ? "Failed to delete customer"
-          : "Failed to delete lead",
-      );
+      setError("Failed to delete lead");
       console.error(err);
     } finally {
       setDeleting(false);
@@ -221,13 +198,8 @@ const CustomersList = () => {
     setCustomerToDelete(null);
   };
 
-  // Get current list based on active tab
-  const currentList = currentTab === 0 ? customers : leads;
-  const currentLabel = currentTab === 0 ? "customer" : "lead";
-  const currentLabelPlural = currentTab === 0 ? "customers" : "leads";
-
-  // Filter based on search query
-  const filteredCustomers = currentList.filter((customer) => {
+  // Filter customers based on search query
+  const filteredCustomers = customers.filter((customer) => {
     if (!searchQuery) return true;
 
     const query = searchQuery.toLowerCase();
@@ -268,7 +240,7 @@ const CustomersList = () => {
         mb={3}
       >
         <Typography variant="h4" component="h1">
-          Customers & Leads
+          Leads
         </Typography>
         <Button
           variant="contained"
@@ -276,7 +248,7 @@ const CustomersList = () => {
           startIcon={<AddIcon />}
           onClick={handleOpenModal}
         >
-          Create {currentTab === 0 ? "Customer" : "Lead"}
+          Create Lead
         </Button>
       </Box>
 
@@ -286,18 +258,10 @@ const CustomersList = () => {
         </Alert>
       )}
 
-      {/* Tabs */}
-      <Paper sx={{ mb: 3 }}>
-        <Tabs value={currentTab} onChange={handleTabChange}>
-          <Tab label={`Customers (${customers.length})`} />
-          <Tab label={`Leads (${leads.length})`} />
-        </Tabs>
-      </Paper>
-
       <Box mb={2}>
         <TextField
           fullWidth
-          placeholder={`Search ${currentLabelPlural} by name...`}
+          placeholder="Search leads by name..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           InputProps={{
@@ -315,7 +279,7 @@ const CustomersList = () => {
           <TableHead sx={{ backgroundColor: "grey.100" }}>
             <TableRow>
               <TableCell>
-                <strong>{currentTab === 0 ? "Customer" : "Lead"} Name</strong>
+                <strong>Lead Name</strong>
               </TableCell>
               <TableCell>
                 <strong>Address</strong>
@@ -344,9 +308,9 @@ const CustomersList = () => {
                     color="text.secondary"
                     sx={{ py: 3 }}
                   >
-                    {currentList.length === 0
-                      ? `No ${currentLabelPlural} found. Create your first ${currentLabel} to get started.`
-                      : `No ${currentLabelPlural} match your search.`}
+                    {customers.length === 0
+                      ? "No leads found. Create your first lead to get started."
+                      : "No leads match your search."}
                   </Typography>
                 </TableCell>
               </TableRow>
@@ -389,9 +353,7 @@ const CustomersList = () => {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel}>
-        <DialogTitle>
-          Delete {currentTab === 0 ? "Customer" : "Lead"}
-        </DialogTitle>
+        <DialogTitle>Delete Lead</DialogTitle>
         <DialogContent>
           <DialogContentText>
             Are you sure you want to delete {customerToDelete?.firstName}{" "}
@@ -420,7 +382,6 @@ const CustomersList = () => {
         onClose={handleCloseModal}
         customerId={editCustomerId}
         onSuccess={handleCustomerSuccess}
-        defaultStatus={currentTab === 0 ? "customer" : "lead"}
       />
 
       {/* Interaction Form Modal */}
@@ -456,4 +417,4 @@ const CustomersList = () => {
   );
 };
 
-export default CustomersList;
+export default LeadsList;

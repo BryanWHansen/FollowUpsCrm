@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Link as RouterLink } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { useState, useEffect } from "react";
+import { Link as RouterLink, useLocation } from "react-router-dom";
+import { useForm } from "react-hook-form";
 import {
   Box,
   Container,
@@ -12,18 +12,26 @@ import {
   InputAdornment,
   IconButton,
   Alert,
-} from '@mui/material';
-import {
-  Visibility,
-  VisibilityOff,
-} from '@mui/icons-material';
-import { useAuth } from '../../contexts/AuthContext';
+} from "@mui/material";
+import { Visibility, VisibilityOff } from "@mui/icons-material";
+import { useAuth } from "../../contexts/AuthContext";
 
 const Login = () => {
+  const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+
+  // Check for success message from navigation state
+  useEffect(() => {
+    if (location.state?.message) {
+      setSuccessMessage(location.state.message);
+      // Clear the message from history state
+      window.history.replaceState({}, document.title);
+    }
+  }, [location]);
 
   const {
     register,
@@ -38,7 +46,8 @@ const Login = () => {
   };
 
   const onSubmit = async (data) => {
-    setError('');
+    setError("");
+    setSuccessMessage("");
     setLoading(true);
 
     try {
@@ -48,16 +57,16 @@ const Login = () => {
         // Keep email, only reset password
         reset({
           email: data.email,
-          password: '',
+          password: "",
         });
       }
     } catch (err) {
-      setError('An unexpected error occurred');
+      setError("An unexpected error occurred");
       // Keep email, only reset password
-      const currentEmail = getValues('email');
+      const currentEmail = getValues("email");
       reset({
         email: currentEmail,
-        password: '',
+        password: "",
       });
     } finally {
       setLoading(false);
@@ -69,18 +78,24 @@ const Login = () => {
       <Box
         sx={{
           marginTop: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
         }}
       >
-        <Paper elevation={3} sx={{ padding: 4, width: '100%' }}>
+        <Paper elevation={3} sx={{ padding: 4, width: "100%" }}>
           <Typography component="h1" variant="h4" align="center" gutterBottom>
             Follow-Ups CRM
           </Typography>
           <Typography component="h2" variant="h6" align="center" sx={{ mb: 3 }}>
             Sign In
           </Typography>
+
+          {successMessage && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              {successMessage}
+            </Alert>
+          )}
 
           {error && (
             <Alert severity="error" sx={{ mb: 2 }}>
@@ -98,11 +113,11 @@ const Login = () => {
               name="email"
               autoComplete="email"
               autoFocus
-              {...register('email', {
-                required: 'Email is required',
+              {...register("email", {
+                required: "Email is required",
                 pattern: {
                   value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                  message: 'Invalid email address',
+                  message: "Invalid email address",
                 },
               })}
               error={!!errors.email}
@@ -115,11 +130,11 @@ const Login = () => {
               fullWidth
               name="password"
               label="Password"
-              type={showPassword ? 'text' : 'password'}
+              type={showPassword ? "text" : "password"}
               id="password"
               autoComplete="current-password"
-              {...register('password', {
-                required: 'Password is required',
+              {...register("password", {
+                required: "Password is required",
               })}
               error={!!errors.password}
               helperText={errors.password?.message}
@@ -145,12 +160,12 @@ const Login = () => {
               sx={{ mt: 3, mb: 2 }}
               disabled={loading}
             >
-              {loading ? 'Signing In...' : 'Sign In'}
+              {loading ? "Signing In..." : "Sign In"}
             </Button>
 
-            <Box sx={{ textAlign: 'center' }}>
+            <Box sx={{ textAlign: "center" }}>
               <Typography variant="body2">
-                Don't have an account?{' '}
+                Don't have an account?{" "}
                 <Link component={RouterLink} to="/register" variant="body2">
                   Register
                 </Link>

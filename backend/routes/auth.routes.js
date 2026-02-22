@@ -48,4 +48,14 @@ router.patch(
 // DELETE /api/auth/account - Delete user account and all data
 router.delete("/account", authenticateToken, authController.deleteAccount);
 
+// POST /api/auth/verify-email - Verify email with token
+router.post("/verify-email", authController.verifyEmail);
+
+// POST /api/auth/resend-verification - Resend verification email
+router.post(
+  "/resend-verification",
+  authenticateToken,
+  authController.resendVerification,
+);
+
 module.exports = router;

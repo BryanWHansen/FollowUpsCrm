@@ -8,11 +8,16 @@ export const authAPI = {
   getCurrentUser: () => api.get("/api/auth/me"),
   changePassword: (passwordData) =>
     api.put("/api/auth/change-password", passwordData),
+  verifyEmail: (token) => api.post("/api/auth/verify-email", { token }),
+  resendVerification: () => api.post("/api/auth/resend-verification"),
 };
 
 // Customer API
 export const customerAPI = {
-  getAll: () => api.get("/api/customers"),
+  getAll: (status) => {
+    const url = status ? `/api/customers?status=${status}` : "/api/customers";
+    return api.get(url);
+  },
   getById: (id) => api.get(`/api/customers/${id}`),
   create: (customer) => api.post("/api/customers", customer),
   update: (id, customer) => api.put(`/api/customers/${id}`, customer),
@@ -62,6 +67,8 @@ export const followupAPI = {
   snooze: (id, data) => api.put(`/api/followups/${id}/snooze`, data),
   delete: (id) => api.delete(`/api/followups/${id}`),
   sendDigest: () => api.post("/api/followups/send-digest"),
+  sendOverdue: () => api.post("/api/followups/send-overdue"),
+  sendToday: () => api.post("/api/followups/send-today"),
 };
 
 // Interest Vehicle API
