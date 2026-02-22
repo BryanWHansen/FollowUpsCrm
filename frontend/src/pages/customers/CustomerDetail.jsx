@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { styled } from "@mui/material/styles";
 import {
   Box,
@@ -558,7 +558,7 @@ const CustomerDetail = () => {
             </Grid>
           )}
 
-          {/* Purchased Vehicles Card */}
+          {/* Purchased Vehicles Card - Only show for customers, not leads */}
           {interactions.length > 0 && (
             <Grid item xs={12} md={6}>
               <Card>
@@ -791,8 +791,23 @@ const CustomerDetail = () => {
                       No follow-ups yet
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Create an interaction and add a vehicle to generate
-                      follow-ups automatically.
+                      {interactions.length > 0 ? (
+                        <>
+                          Create a{" "}
+                          <Link
+                            to="/templates"
+                            style={{
+                              color: "#1976d2",
+                              textDecoration: "underline",
+                            }}
+                          >
+                            template
+                          </Link>{" "}
+                          for the interaction associated with this customer.
+                        </>
+                      ) : (
+                        "Create an interaction and add a vehicle to generate follow-ups automatically."
+                      )}
                     </Typography>
                   </Box>
                 ) : (

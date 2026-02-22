@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Container,
   Paper,
@@ -27,6 +28,7 @@ import ChangePasswordModal from "../../components/modals/ChangePasswordModal";
 import { userPreferencesAPI } from "../../api/endpoints";
 
 const UserSettings = () => {
+  const navigate = useNavigate();
   const { user, updateUser, changePassword, deleteAccount } = useAuth();
   const [selectedTab, setSelectedTab] = useState("general");
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
@@ -150,6 +152,10 @@ const UserSettings = () => {
       return;
     }
 
+    // Check if email actually changed
+    const emailChanged =
+      securityFormData.email.toLowerCase() !== user.email.toLowerCase();
+
     try {
       const result = await updateUser({
         firstName: user.firstName,
@@ -157,7 +163,12 @@ const UserSettings = () => {
         email: securityFormData.email,
       });
       if (result.success) {
-        setSecuritySuccess("Email updated successfully");
+        if (emailChanged) {
+          // Email changed, redirect to verification page
+          navigate("/verify-email");
+        } else {
+          setSecuritySuccess("Email updated successfully");
+        }
       } else {
         setSecurityError(result.error || "Failed to update email");
       }

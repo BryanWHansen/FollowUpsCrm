@@ -24,6 +24,7 @@ import {
   ListItemText,
   Dialog as PlaceholderDialog,
   DialogActions,
+  Snackbar,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import { templateAPI } from "../../api/endpoints";
@@ -42,6 +43,10 @@ const TemplateFormModal = ({ open, onClose, templateId, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [placeholderDialogOpen, setPlaceholderDialogOpen] = useState(false);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+  });
 
   const {
     register,
@@ -106,7 +111,15 @@ const TemplateFormModal = ({ open, onClose, templateId, onSuccess }) => {
       if (isEditMode) {
         await templateAPI.update(templateId, data);
       } else {
-        await templateAPI.create(data);
+        const response = await templateAPI.create(data);
+
+        // Check if follow-ups were generated for existing interactions
+        if (response.data?.generatedFollowups > 0) {
+          setSnackbar({
+            open: true,
+            message: `Template created successfully! Generated ${response.data.generatedFollowups} follow-up${response.data.generatedFollowups > 1 ? "s" : ""} for existing interactions.`,
+          });
+        }
       }
 
       if (onSuccess) {
@@ -373,6 +386,14 @@ const TemplateFormModal = ({ open, onClose, templateId, onSuccess }) => {
           <Button onClick={() => setPlaceholderDialogOpen(false)}>Close</Button>
         </DialogActions>
       </PlaceholderDialog>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        message={snackbar.message}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      />
     </>
   );
 };

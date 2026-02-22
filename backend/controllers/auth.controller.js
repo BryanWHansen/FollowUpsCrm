@@ -1,12 +1,14 @@
 // Authentication controller - handles all auth-related business logic
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const pool = require("../db");
 const {
   mapToUser,
   validateUserRegistration,
   validateUserLogin,
 } = require("../models/user.model");
+const { sendVerificationEmail } = require("../services/emailService");
 const { get } = require("../routes/auth.routes");
 
 /**
@@ -36,18 +38,37 @@ const register = async (req, res) => {
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    // Insert user with email digest defaults
+    // Generate verification token
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+    const verificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    // Insert user with email digest defaults and verification token
     const result = await pool.query(
       `INSERT INTO users (
         email, passwordHash, firstName, lastName,
-        emailDigestEnabled, emailDigestTime, emailDigestTimezone
+        emailDigestEnabled, emailDigestTime, emailDigestTimezone,
+        email_verified, verification_token, verification_token_expiry
       ) 
-       VALUES ($1, $2, $3, $4, true, '08:00:00', 'America/New_York') 
+       VALUES ($1, $2, $3, $4, true, '08:00:00', 'America/New_York', false, $5, $6) 
        RETURNING *`,
-      [email.toLowerCase(), passwordHash, firstName, lastName],
+      [
+        email.toLowerCase(),
+        passwordHash,
+        firstName,
+        lastName,
+        verificationToken,
+        verificationTokenExpiry,
+      ],
     );
 
     const newUser = mapToUser(result.rows[0]);
+
+    // Send verification email
+    await sendVerificationEmail(
+      email.toLowerCase(),
+      verificationToken,
+      firstName,
+    );
 
     // Generate JWT token
     const token = jwt.sign(
@@ -191,7 +212,56 @@ const updateUser = async (req, res) => {
         .json({ error: "Email already in use by another user" });
     }
 
-    // Update user
+    // Check if email changed
+    const currentUserResult = await pool.query(
+      "SELECT email FROM users WHERE userId = $1",
+      [userId],
+    );
+    const emailChanged =
+      currentUserResult.rows[0].email !== email.toLowerCase();
+
+    // If email changed, reset verification and send new verification email
+    if (emailChanged) {
+      const verificationToken = crypto.randomBytes(32).toString("hex");
+      const verificationTokenExpiry = new Date(
+        Date.now() + 24 * 60 * 60 * 1000,
+      ); // 24 hours
+
+      // Update user with new email and reset verification
+      const result = await pool.query(
+        `UPDATE users 
+         SET firstName = $1, lastName = $2, email = $3, 
+             email_verified = false, verification_token = $5, 
+             verification_token_expiry = $6, updatedAt = NOW()
+         WHERE userId = $4
+         RETURNING *`,
+        [
+          firstName,
+          lastName,
+          email.toLowerCase(),
+          userId,
+          verificationToken,
+          verificationTokenExpiry,
+        ],
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const updatedUser = mapToUser(result.rows[0]);
+
+      // Send verification email to new address
+      await sendVerificationEmail(
+        email.toLowerCase(),
+        verificationToken,
+        firstName,
+      );
+
+      return res.json(updatedUser);
+    }
+
+    // Email didn't change, just update other fields
     const result = await pool.query(
       `UPDATE users 
        SET firstName = $1, lastName = $2, email = $3, updatedAt = NOW()
@@ -414,6 +484,103 @@ const deleteAccount = async (req, res) => {
   }
 };
 
+/**
+ * Verify email with token
+ */
+const verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ error: "Verification token is required" });
+    }
+
+    // Find user with this token
+    const result = await pool.query(
+      `SELECT * FROM users 
+       WHERE verification_token = $1 
+       AND verification_token_expiry > NOW()`,
+      [token],
+    );
+
+    if (result.rows.length === 0) {
+      return res
+        .status(400)
+        .json({ error: "Invalid or expired verification token" });
+    }
+
+    const userRow = result.rows[0];
+
+    // Update user to verified and clear token
+    await pool.query(
+      `UPDATE users 
+       SET email_verified = true, verification_token = NULL, verification_token_expiry = NULL
+       WHERE userId = $1`,
+      [userRow.userid],
+    );
+
+    const user = mapToUser(userRow);
+    user.emailVerified = true;
+
+    res.json({
+      message: "Email verified successfully",
+      user,
+    });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+/**
+ * Resend verification email
+ */
+const resendVerification = async (req, res) => {
+  try {
+    const { userId } = req.user;
+
+    // Get user info
+    const result = await pool.query("SELECT * FROM users WHERE userId = $1", [
+      userId,
+    ]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const userRow = result.rows[0];
+
+    // Check if already verified
+    if (userRow.email_verified) {
+      return res.status(400).json({ error: "Email already verified" });
+    }
+
+    // Generate new verification token
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+    const verificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    // Update user with new token
+    await pool.query(
+      `UPDATE users 
+       SET verification_token = $1, verification_token_expiry = $2
+       WHERE userId = $3`,
+      [verificationToken, verificationTokenExpiry, userId],
+    );
+
+    // Send verification email
+    await sendVerificationEmail(
+      userRow.email,
+      verificationToken,
+      userRow.firstname,
+    );
+
+    res.json({ message: "Verification email sent" });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -424,4 +591,6 @@ module.exports = {
   updateEmailPreferences,
   getProfile,
   deleteAccount,
+  verifyEmail,
+  resendVerification,
 };

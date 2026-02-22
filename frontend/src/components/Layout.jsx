@@ -68,6 +68,7 @@ const Layout = () => {
   const menuItems = [
     { text: "Dashboard", icon: <DashboardIcon />, path: "/dashboard" },
     { text: "Customers", icon: <PeopleIcon />, path: "/customers" },
+    { text: "Follow-ups", icon: <CheckCircleIcon />, path: "/followups" },
     { text: "Templates", icon: <DescriptionIcon />, path: "/templates" },
   ];
 

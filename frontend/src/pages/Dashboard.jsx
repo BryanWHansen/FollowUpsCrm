@@ -18,7 +18,7 @@ import {
   Link as MuiLink,
 } from "@mui/material";
 import { Link } from "react-router-dom";
-import { followupAPI, interactionAPI } from "../api/endpoints";
+import { followupAPI, interactionAPI, customerAPI } from "../api/endpoints";
 import {
   formatInteractionType,
   getInteractionTypeColor,
@@ -29,7 +29,10 @@ const Dashboard = () => {
   const [upcomingFollowups, setUpcomingFollowups] = useState([]);
   const [monthlyFollowups, setMonthlyFollowups] = useState([]);
   const [todoInteractions, setTodoInteractions] = useState([]);
+  const [lastWeekFollowups, setLastWeekFollowups] = useState([]);
   const [typesWithoutTemplates, setTypesWithoutTemplates] = useState([]);
+  const [customerCount, setCustomerCount] = useState(0);
+  const [leadCount, setLeadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -46,22 +49,41 @@ const Dashboard = () => {
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-      const [upcomingRes, monthlyRes, interactionsRes, typesRes] =
-        await Promise.all([
-          followupAPI.getUpcoming(3),
-          followupAPI.getAll({
-            scheduledDateFrom: firstDay.toISOString().split("T")[0],
-            scheduledDateTo: lastDay.toISOString().split("T")[0],
-            status: "pending",
-          }),
-          interactionAPI.getWithoutVehicles(),
-          interactionAPI.getTypesWithoutTemplates(),
-        ]);
+      const [
+        upcomingRes,
+        monthlyRes,
+        lastWeekRes,
+        interactionsRes,
+        typesRes,
+        customersRes,
+        leadsRes,
+      ] = await Promise.all([
+        followupAPI.getUpcoming(3),
+        followupAPI.getAll({
+          scheduledDateFrom: firstDay.toISOString().split("T")[0],
+          scheduledDateTo: lastDay.toISOString().split("T")[0],
+          status: "pending",
+        }),
+        followupAPI.getAll({
+          scheduledDateFrom: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .split("T")[0],
+          scheduledDateTo: now.toISOString().split("T")[0],
+          status: "pending",
+        }),
+        interactionAPI.getWithoutVehicles(),
+        interactionAPI.getTypesWithoutTemplates(),
+        customerAPI.getAll("customer"),
+        customerAPI.getAll("lead"),
+      ]);
 
       setUpcomingFollowups(upcomingRes.data);
       setMonthlyFollowups(monthlyRes.data);
+      setLastWeekFollowups(lastWeekRes.data);
       setTodoInteractions(interactionsRes.data);
       setTypesWithoutTemplates(typesRes.data);
+      setCustomerCount(customersRes.data.length);
+      setLeadCount(leadsRes.data.length);
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
       setError("Failed to load dashboard data");
@@ -102,6 +124,16 @@ const Dashboard = () => {
 
   const summaryCards = [
     {
+      title: "Customers",
+      value: customerCount,
+      color: "inherit",
+    },
+    {
+      title: "Leads",
+      value: leadCount,
+      color: "inherit",
+    },
+    {
       title: "Upcoming Follow-ups",
       value: upcomingFollowups.length,
       color: "inherit",
@@ -118,7 +150,7 @@ const Dashboard = () => {
     },
     {
       title: "Overdue",
-      value: upcomingFollowups.filter((f) => isOverdue(f.scheduledDate)).length,
+      value: lastWeekFollowups.filter((f) => isOverdue(f.scheduledDate)).length,
       color: "error",
     },
   ];
@@ -307,35 +339,57 @@ const Dashboard = () => {
 
           {/* Summary Cards in 2x2 Grid */}
           <Card>
-            <CardContent>
+            <CardContent sx={{ py: 2 }}>
               <Grid container spacing={2}>
-                {summaryCards.map((card, index) => (
-                  <Grid item xs={6} key={index}>
-                    <Card
-                      sx={{
-                        height: "100%",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        py: 2,
-                      }}
-                    >
-                      <CardContent sx={{ textAlign: "center", p: 1 }}>
-                        <Typography
-                          color="text.secondary"
-                          variant="caption"
-                          gutterBottom
-                          sx={{ fontSize: "0.7rem" }}
-                        >
-                          {card.title}
-                        </Typography>
-                        <Typography variant="h5" color={card.color}>
-                          {card.value}
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                ))}
+                {summaryCards.map((card, index) => {
+                  const isClickable =
+                    card.title === "Overdue" || card.title === "Due Today";
+                  const getTodayDate = () =>
+                    new Date().toISOString().split("T")[0];
+
+                  return (
+                    <Grid item xs={6} key={index}>
+                      <Card
+                        component={isClickable ? Link : "div"}
+                        to={
+                          card.title === "Overdue"
+                            ? "/followups?overdue=true"
+                            : card.title === "Due Today"
+                              ? `/followups?date=${getTodayDate()}`
+                              : undefined
+                        }
+                        sx={{
+                          height: "100%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          py: 1,
+                          textDecoration: "none",
+                          cursor: isClickable ? "pointer" : "default",
+                          "&:hover": isClickable
+                            ? {
+                                backgroundColor: "action.hover",
+                              }
+                            : {},
+                        }}
+                      >
+                        <CardContent sx={{ textAlign: "center", p: 0.5 }}>
+                          <Typography
+                            color="text.secondary"
+                            variant="caption"
+                            gutterBottom
+                            sx={{ fontSize: "0.65rem" }}
+                          >
+                            {card.title}
+                          </Typography>
+                          <Typography variant="h6" color={card.color}>
+                            {card.value}
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  );
+                })}
               </Grid>
             </CardContent>
           </Card>

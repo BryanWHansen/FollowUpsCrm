@@ -112,7 +112,12 @@ const getInteractionsWithoutVehicles = async (req, res) => {
       FROM interactions i
       JOIN customers c ON i.customerId = c.customerId
       LEFT JOIN purchasedvehicles pv ON i.interactionid = pv.interactionid
-      WHERE i.userId = $1 AND pv.vehicleid IS NULL
+      LEFT JOIN customerinterestvehicles iv ON i.interactionid = iv.interactionid
+      WHERE i.userId = $1 
+        AND (
+          (i.interactionType = 'purchase' AND pv.vehicleid IS NULL)
+          OR (i.interactionType != 'purchase' AND iv.interestvehicleid IS NULL)
+        )
       ORDER BY i.interactionDate DESC, i.createdAt DESC
     `;
 
@@ -175,6 +180,16 @@ const createInteraction = async (req, res) => {
     );
 
     const newInteraction = mapToInteraction(result.rows[0]);
+
+    // Auto-update customer status to 'customer' if interaction is a purchase
+    if (interactionType === "purchase") {
+      await pool.query(
+        `UPDATE customers 
+         SET customerStatus = 'customer', updatedAt = CURRENT_TIMESTAMP 
+         WHERE customerId = $1 AND userId = $2 AND customerStatus != 'customer'`,
+        [customerId, userId],
+      );
+    }
 
     res.status(201).json(newInteraction);
   } catch (err) {

@@ -2,7 +2,10 @@
 const express = require("express");
 const router = express.Router();
 const interactionController = require("../controllers/interaction.controller");
-const { authenticateToken } = require("../middleware/auth.middleware");
+const {
+  authenticateToken,
+  requireEmailVerification,
+} = require("../middleware/auth.middleware");
 
 // All interaction routes require authentication
 router.use(authenticateToken);
@@ -25,13 +28,25 @@ router.get("/", interactionController.getAllInteractions);
 // GET /api/interactions/:id - Get interaction by id
 router.get("/:id", interactionController.getInteractionById);
 
-// POST /api/interactions - Create a new interaction
-router.post("/", interactionController.createInteraction);
+// POST /api/interactions - Create a new interaction (requires email verification)
+router.post(
+  "/",
+  requireEmailVerification,
+  interactionController.createInteraction,
+);
 
-// PUT /api/interactions/:id - Update an interaction
-router.put("/:id", interactionController.updateInteraction);
+// PUT /api/interactions/:id - Update an interaction (requires email verification)
+router.put(
+  "/:id",
+  requireEmailVerification,
+  interactionController.updateInteraction,
+);
 
-// DELETE /api/interactions/:id - Delete an interaction
-router.delete("/:id", interactionController.deleteInteraction);
+// DELETE /api/interactions/:id - Delete an interaction (requires email verification)
+router.delete(
+  "/:id",
+  requireEmailVerification,
+  interactionController.deleteInteraction,
+);
 
 module.exports = router;

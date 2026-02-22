@@ -95,7 +95,7 @@ const renderTemplate = (template, data) => {
   rendered = rendered.replace(/\{\{userLastName\}\}/g, data.userLastName || "");
   rendered = rendered.replace(
     /\{\{customerFirstName\}\}/g,
-    data.customerFirstName || "",
+    data.customerPreferredName || data.customerFirstName || "",
   );
   rendered = rendered.replace(
     /\{\{customerLastName\}\}/g,

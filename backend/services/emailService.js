@@ -215,9 +215,183 @@ async function testEmailConfig() {
   }
 }
 
+/**
+ * Send email verification email
+ * @param {string} email - User's email address
+ * @param {string} token - Verification token
+ * @param {string} userName - User's first name
+ * @returns {Promise<boolean>} - Success status
+ */
+async function sendVerificationEmail(email, token, userName) {
+  try {
+    if (!initializeSendGrid()) {
+      console.error("SendGrid not configured");
+      return false;
+    }
+
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const verificationLink = `${frontendUrl}/verify-email?token=${token}`;
+
+    // Get sender name from env or use default
+    const fromName = process.env.EMAIL_FROM_NAME || "FollowUps CRM";
+    const fromEmail = process.env.EMAIL_FROM;
+
+    const msg = {
+      to: email,
+      from: {
+        email: fromEmail,
+        name: fromName,
+      },
+      replyTo: fromEmail,
+      subject: "Please Confirm Your Email Address",
+      // Preheader text (shows in email preview)
+      headers: {
+        "X-Priority": "3",
+        "X-MSMail-Priority": "Normal",
+        Importance: "Normal",
+      },
+      categories: ["email-verification"],
+      customArgs: {
+        type: "verification",
+      },
+      html: `
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Verify Your Email</title>
+        </head>
+        <body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; background-color: #f4f4f4;">
+          <!-- Preheader text -->
+          <div style="display: none; max-height: 0; overflow: hidden;">
+            Welcome to FollowUps CRM! Please verify your email address to complete your registration.
+          </div>
+          
+          <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f4f4f4;" cellpadding="0" cellspacing="0">
+            <tr>
+              <td align="center" style="padding: 40px 0;">
+                
+                <!-- Main email container -->
+                <table role="presentation" style="width: 100%; max-width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" cellpadding="0" cellspacing="0">
+                  
+                  <!-- Header -->
+                  <tr>
+                    <td style="padding: 40px 30px; text-align: center; background-color: #1976d2; border-radius: 8px 8px 0 0;">
+                      <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">
+                        FollowUps CRM
+                      </h1>
+                    </td>
+                  </tr>
+                  
+                  <!-- Body -->
+                  <tr>
+                    <td style="padding: 40px 30px;">
+                      <h2 style="margin: 0 0 20px 0; color: #333333; font-size: 24px;">
+                        Welcome, ${userName}!
+                      </h2>
+                      
+                      <p style="margin: 0 0 20px 0; color: #666666; font-size: 16px; line-height: 1.6;">
+                        Thank you for creating an account with FollowUps CRM. We're excited to have you on board!
+                      </p>
+                      
+                      <p style="margin: 0 0 20px 0; color: #666666; font-size: 16px; line-height: 1.6;">
+                        To complete your registration and start using all the features of FollowUps CRM, 
+                        we need to verify that this email address belongs to you.
+                      </p>
+                      
+                      <p style="margin: 0 0 30px 0; color: #666666; font-size: 16px; line-height: 1.6;">
+                        Please click the button below to confirm your email address:
+                      </p>
+                      
+                      <!-- Button -->
+                      <table role="presentation" style="margin: 0 auto;" cellpadding="0" cellspacing="0">
+                        <tr>
+                          <td style="border-radius: 5px; background-color: #1976d2;">
+                            <a href="${verificationLink}" 
+                               style="display: inline-block; padding: 16px 40px; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: bold; border-radius: 5px;">
+                              Confirm Email Address
+                            </a>
+                          </td>
+                        </tr>
+                      </table>
+                      
+                      <p style="margin: 30px 0 20px 0; color: #666666; font-size: 14px; line-height: 1.6;">
+                        If the button doesn't work, you can copy and paste this link into your web browser:
+                      </p>
+                      
+                      <p style="margin: 0 0 20px 0; padding: 15px; background-color: #f8f9fa; border-left: 3px solid #1976d2; color: #1976d2; font-size: 13px; word-break: break-all; font-family: monospace;">
+                        ${verificationLink}
+                      </p>
+                      
+                      <hr style="border: none; border-top: 1px solid #eeeeee; margin: 30px 0;">
+                      
+                      <p style="margin: 0 0 10px 0; color: #999999; font-size: 12px; line-height: 1.6;">
+                        <strong>Important:</strong> This verification link will expire in 24 hours for security reasons.
+                      </p>
+                      
+                      <p style="margin: 0; color: #999999; font-size: 12px; line-height: 1.6;">
+                        If you didn't create an account with FollowUps CRM, you can safely ignore this email. 
+                        No account will be created without verification.
+                      </p>
+                    </td>
+                  </tr>
+                  
+                  <!-- Footer -->
+                  <tr>
+                    <td style="padding: 30px; text-align: center; background-color: #f8f9fa; border-radius: 0 0 8px 8px;">
+                      <p style="margin: 0 0 10px 0; color: #999999; font-size: 12px;">
+                        This email was sent by FollowUps CRM
+                      </p>
+                      <p style="margin: 0; color: #999999; font-size: 12px;">
+                        © ${new Date().getFullYear()} FollowUps CRM. All rights reserved.
+                      </p>
+                    </td>
+                  </tr>
+                  
+                </table>
+                
+              </td>
+            </tr>
+          </table>
+        </body>
+        </html>
+      `,
+      text: `Welcome to FollowUps CRM, ${userName}!
+
+Thank you for creating an account. We need to verify your email address to complete your registration.
+
+Please verify your email by opening this link in your web browser:
+
+${verificationLink}
+
+This verification link will expire in 24 hours for security reasons.
+
+If the link above doesn't work, copy and paste it into your browser's address bar.
+
+If you didn't create an account with FollowUps CRM, you can safely ignore this email.
+
+---
+FollowUps CRM
+© ${new Date().getFullYear()} All rights reserved.`,
+    };
+
+    await sgMail.send(msg);
+    console.log(`✅ Verification email sent to ${email}`);
+    return true;
+  } catch (error) {
+    console.error("❌ Error sending verification email:", error);
+    if (error.response) {
+      console.error("SendGrid error details:", error.response.body);
+    }
+    return false;
+  }
+}
+
 module.exports = {
   sendDailyDigest,
   formatSMSLink,
   formatPhoneForSMS,
   testEmailConfig,
+  sendVerificationEmail,
 };
